@@ -40,11 +40,23 @@ router.get('/:id/download', (req, res) => {
   const attachment = db.prepare('SELECT * FROM ticket_attachments WHERE id = ? AND ticket_id = ?').get(req.params.id, req.params.ticketId);
   if (!attachment) return res.status(404).json({ error: 'Attachment not found' });
 
+  // Verify the stored filename is a UUID (defense against DB injection/corruption)
+  if (!/^[0-9a-f-]{36}\.[a-z]{2,5}$/.test(attachment.filename)) {
+    return res.status(500).json({ error: 'Invalid stored filename' });
+  }
+
   const filePath = path.join(uploadsDir, attachment.filename);
+  // Ensure resolved path is still inside uploadsDir (path traversal guard)
+  if (!filePath.startsWith(uploadsDir + path.sep) && filePath !== uploadsDir) {
+    return res.status(400).json({ error: 'Invalid file path' });
+  }
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk' });
 
-  res.setHeader('Content-Disposition', `attachment; filename="${attachment.original_name}"`);
+  // RFC5987-encoded filename — handles unicode, quotes, special characters safely
+  const encodedName = encodeURIComponent(attachment.original_name);
+  res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedName}`);
   res.setHeader('Content-Type', attachment.mime_type || 'application/octet-stream');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.sendFile(filePath);
 });
 

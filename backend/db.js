@@ -1,6 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 
 const dbPath = path.resolve(__dirname, process.env.SQLITE_PATH || '../bylaws.db');
 const db = new Database(dbPath);
@@ -15,6 +16,7 @@ db.exec(`
     name TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'read_only',
     password_hash TEXT NOT NULL,
+    pw_version INTEGER NOT NULL DEFAULT 1,
     approved INTEGER NOT NULL DEFAULT 0,
     email_verified INTEGER NOT NULL DEFAULT 0,
     verify_token TEXT,
@@ -90,22 +92,49 @@ db.exec(`
     read INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS sse_tokens (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at INTEGER NOT NULL
+  );
 `);
 
+// Migrate existing DBs: add pw_version if missing
+try {
+  db.exec("ALTER TABLE users ADD COLUMN pw_version INTEGER NOT NULL DEFAULT 1");
+} catch { /* column already exists */ }
+
+// Prune expired SSE tokens periodically
+setInterval(() => {
+  try { db.prepare('DELETE FROM sse_tokens WHERE expires_at < ?').run(Date.now()); } catch {}
+}, 60000);
+
 // Seed admin account on first run
-function seedAdmin() {
+async function seedAdmin() {
   const adminEmail = process.env.ADMIN_EMAIL || 'jorge.fonsecacacho@unlv.edu';
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(adminEmail);
-  if (!existing) {
-    const hash = bcrypt.hashSync('Admin#UNLV2026!', 12);
-    db.prepare(`
-      INSERT INTO users (email, name, role, password_hash, approved, email_verified)
-      VALUES (?, ?, 'admin', ?, 1, 1)
-    `).run(adminEmail, 'Jorge Fonseca', hash);
-    console.log(`[db] Seeded admin account: ${adminEmail}`);
+  if (existing) return;
+
+  // Use ADMIN_PASSWORD from env; generate a strong random one if not set
+  let adminPw = process.env.ADMIN_PASSWORD;
+  const generated = !adminPw;
+  if (generated) {
+    adminPw = crypto.randomBytes(16).toString('hex');
+  }
+
+  const hash = await bcrypt.hash(adminPw, 12);
+  db.prepare(`
+    INSERT INTO users (email, name, role, password_hash, approved, email_verified, pw_version)
+    VALUES (?, ?, 'admin', ?, 1, 1, 1)
+  `).run(adminEmail, 'Jorge Fonseca', hash);
+
+  console.log(`[db] Seeded admin account: ${adminEmail}`);
+  if (generated) {
+    console.log(`[db] *** GENERATED ADMIN PASSWORD: ${adminPw} — change this immediately ***`);
   }
 }
 
-seedAdmin();
+seedAdmin().catch(e => console.error('[db] seedAdmin error:', e));
 
 module.exports = db;

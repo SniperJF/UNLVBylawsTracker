@@ -86,19 +86,33 @@ function renderNav(activePage) {
     document.querySelectorAll('[data-admin]').forEach(el => el.remove());
   }
 
-  // Notification SSE
-  const token = getToken();
-  if (token) {
-    const es = new EventSource(`${API}/notifications/stream?token=${token}`);
-    es.onmessage = (e) => {
-      const data = JSON.parse(e.data);
-      if (data.unread !== undefined) updateBadge(data.unread);
-      if (data.type === 'notification') updateBadge(data.unread);
-    };
-  }
-
   // Fetch initial unread count
   apiFetch('/notifications/unread-count').then(d => updateBadge(d?.count || 0)).catch(() => {});
+
+  // Open SSE connection using a short-lived one-time token (not the JWT)
+  // so the long-lived JWT never appears in nginx access logs
+  connectSSE();
+}
+
+async function connectSSE() {
+  try {
+    const { token: sseToken } = await apiFetch('/auth/sse-token', { method: 'POST' });
+    const es = new EventSource(`${API}/notifications/stream?token=${encodeURIComponent(sseToken)}`);
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.unread !== undefined) updateBadge(data.unread);
+        if (data.type === 'notification') updateBadge(data.unread);
+      } catch {}
+    };
+    es.onerror = () => {
+      es.close();
+      // Retry after 30s if connection drops
+      setTimeout(connectSSE, 30000);
+    };
+  } catch {
+    // If SSE token exchange fails (e.g. logged out), don't retry
+  }
 }
 
 function updateBadge(count) {
@@ -108,5 +122,3 @@ function updateBadge(count) {
   else badge.classList.add('hidden');
 }
 
-// SSE also needs token in headers but EventSource doesn't support headers
-// We pass it as query param and check on server

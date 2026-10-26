@@ -8,6 +8,11 @@ router.use(requireAuth);
 const TRACK_A_PHASES = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','GENERAL_COUNSEL','PROVOST_REVIEW','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
 const TRACK_B_PHASES = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PROVOST_REVIEW','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
 
+// Roles that can advance tickets through governance phases
+const MOVER_ROLES = ['admin','bylaws_chair','senate_manager','ec_member','provost_office'];
+// Roles that can create tickets
+const CREATOR_ROLES = ['admin','bylaws_chair','senate_manager','ec_member','unit_submitter'];
+
 function phasesFor(type) {
   return type === 'university_amendment' ? TRACK_A_PHASES : TRACK_B_PHASES;
 }
@@ -17,7 +22,7 @@ function createNotification(userId, type, message, ticketId) {
   db.prepare('INSERT INTO notifications (user_id, type, message, ticket_id) VALUES (?, ?, ?, ?)').run(userId, type, message, ticketId || null);
 }
 
-// GET /api/tickets
+// GET /api/tickets — all roles can view
 router.get('/', (req, res) => {
   const { type, status, phase, assignee_id } = req.query;
   let sql = `
@@ -40,7 +45,7 @@ router.get('/', (req, res) => {
   res.json(db.prepare(sql).all(...params));
 });
 
-// GET /api/tickets/:id
+// GET /api/tickets/:id — all roles can view
 router.get('/:id', (req, res) => {
   const ticket = db.prepare(`
     SELECT t.*,
@@ -80,17 +85,22 @@ router.get('/:id', (req, res) => {
   res.json({ ...ticket, history, attachments, comments });
 });
 
-// POST /api/tickets
-router.post('/', (req, res) => {
+// POST /api/tickets — restricted to creator roles
+router.post('/', requireRole(...CREATOR_ROLES), (req, res) => {
   const { type, title, description, bylaws_section, unit_name, assignee_id } = req.body;
   if (!type || !title) return res.status(400).json({ error: 'type and title required' });
+  if (typeof title !== 'string' || title.length > 500) return res.status(400).json({ error: 'Title too long (max 500)' });
+  if (description && description.length > 50000) return res.status(400).json({ error: 'Description too long (max 50000)' });
+  if (bylaws_section && bylaws_section.length > 200) return res.status(400).json({ error: 'Bylaws section too long' });
+
   const phases = phasesFor(type);
+  if (!phases) return res.status(400).json({ error: 'Invalid ticket type' });
   const initial_phase = phases[0];
 
   const result = db.prepare(`
     INSERT INTO tickets (type, title, description, bylaws_section, current_phase, originator_id, assignee_id, unit_name)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(type, title, description || '', bylaws_section || '', initial_phase, req.user.id, assignee_id || null, unit_name || '');
+  `).run(type, title.trim(), (description || '').trim(), (bylaws_section || '').trim(), initial_phase, req.user.id, assignee_id || null, (unit_name || '').trim());
 
   const ticketId = result.lastInsertRowid;
   db.prepare('INSERT INTO ticket_phase_history (ticket_id, phase, entered_by) VALUES (?, ?, ?)').run(ticketId, initial_phase, req.user.id);
@@ -98,10 +108,13 @@ router.post('/', (req, res) => {
   res.status(201).json({ id: ticketId, message: 'Ticket created' });
 });
 
-// PATCH /api/tickets/:id — update fields
+// PATCH /api/tickets/:id — originator or privileged roles only
 router.patch('/:id', (req, res) => {
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+  const canEdit = req.user.id === ticket.originator_id || ['admin','bylaws_chair','senate_manager'].includes(req.user.role);
+  if (!canEdit) return res.status(403).json({ error: 'Only the originator or privileged roles can edit this ticket' });
 
   const allowed = ['title','description','bylaws_section','assignee_id','unit_name','senate_meeting_date','vote_result'];
   const updates = [];
@@ -116,8 +129,8 @@ router.patch('/:id', (req, res) => {
   res.json({ message: 'Updated' });
 });
 
-// POST /api/tickets/:id/advance — move to next phase
-router.post('/:id/advance', (req, res) => {
+// POST /api/tickets/:id/advance — governance roles only
+router.post('/:id/advance', requireRole(...MOVER_ROLES), (req, res) => {
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
   if (ticket.status === 'published') return res.status(400).json({ error: 'Already published' });
@@ -136,17 +149,17 @@ router.post('/:id/advance', (req, res) => {
   db.prepare('UPDATE tickets SET current_phase = ?, status = ?, updated_at = datetime("now") WHERE id = ?').run(next_phase, newStatus, ticket.id);
 
   if (ticket.originator_id) {
-    createNotification(ticket.originator_id, 'phase_change', `Ticket "${ticket.title}" moved to ${next_phase}`, ticket.id);
+    createNotification(ticket.originator_id, 'phase_change', `"${ticket.title}" moved to ${next_phase}`, ticket.id);
   }
   if (ticket.assignee_id && ticket.assignee_id !== ticket.originator_id) {
-    createNotification(ticket.assignee_id, 'phase_change', `Ticket "${ticket.title}" moved to ${next_phase}`, ticket.id);
+    createNotification(ticket.assignee_id, 'phase_change', `"${ticket.title}" moved to ${next_phase}`, ticket.id);
   }
 
   res.json({ message: 'Advanced', new_phase: next_phase });
 });
 
-// POST /api/tickets/:id/stuck — toggle stuck status
-router.post('/:id/stuck', (req, res) => {
+// POST /api/tickets/:id/stuck — governance roles only
+router.post('/:id/stuck', requireRole(...MOVER_ROLES), (req, res) => {
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
 
@@ -154,12 +167,12 @@ router.post('/:id/stuck', (req, res) => {
   db.prepare('UPDATE tickets SET status = ?, updated_at = datetime("now") WHERE id = ?').run(newStatus, ticket.id);
 
   if (ticket.originator_id) {
-    createNotification(ticket.originator_id, 'stuck_change', `Ticket "${ticket.title}" marked ${newStatus}`, ticket.id);
+    createNotification(ticket.originator_id, 'stuck_change', `"${ticket.title}" marked ${newStatus}`, ticket.id);
   }
   res.json({ message: 'Updated', status: newStatus });
 });
 
-// POST /api/tickets/:id/phase — set arbitrary phase (admin/chair)
+// POST /api/tickets/:id/phase — set arbitrary phase (admin/chair/manager)
 router.post('/:id/phase', requireRole('admin','bylaws_chair','senate_manager'), (req, res) => {
   const { phase } = req.body;
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);

@@ -5,8 +5,6 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { sendApprovalEmail } = require('../email');
 
 const router = express.Router();
-
-// All routes require auth
 router.use(requireAuth);
 
 // GET /api/users — admin only
@@ -66,13 +64,16 @@ router.patch('/:id/role', requireRole('admin'), (req, res) => {
 });
 
 // POST /api/users/:id/reset-password — admin resets any user's password
+// Increments pw_version to invalidate all existing sessions for that user
 router.post('/:id/reset-password', requireRole('admin'), async (req, res) => {
   const { new_password } = req.body;
-  if (!new_password || new_password.length < 8) return res.status(400).json({ error: 'Password too short' });
+  if (!new_password || typeof new_password !== 'string' || new_password.length < 8 || new_password.length > 128) {
+    return res.status(400).json({ error: 'Password must be 8–128 characters' });
+  }
 
   const hash = await bcrypt.hash(new_password, 12);
-  db.prepare('UPDATE users SET password_hash = ?, updated_at = datetime("now") WHERE id = ?').run(hash, req.params.id);
-  res.json({ message: 'Password reset' });
+  db.prepare('UPDATE users SET password_hash = ?, pw_version = pw_version + 1, updated_at = datetime("now") WHERE id = ?').run(hash, req.params.id);
+  res.json({ message: 'Password reset — user sessions invalidated' });
 });
 
 module.exports = router;
