@@ -61,7 +61,7 @@ router.get('/verify', (req, res) => {
   const user = db.prepare('SELECT id FROM users WHERE verify_token = ?').get(token);
   if (!user) return res.status(400).json({ error: 'Invalid or expired token' });
 
-  db.prepare('UPDATE users SET email_verified = 1, verify_token = NULL, updated_at = datetime("now") WHERE id = ?').run(user.id);
+  db.prepare('UPDATE users SET email_verified = 1, verify_token = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
   res.json({ message: 'Email verified. Your account is pending admin approval.' });
 });
 
@@ -96,7 +96,7 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
   if (user) {
     const token = uuidv4();
     const expires = Date.now() + 3600 * 1000;
-    db.prepare('UPDATE users SET reset_token = ?, reset_expires = ?, updated_at = datetime("now") WHERE id = ?')
+    db.prepare('UPDATE users SET reset_token = ?, reset_expires = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
       .run(token, expires, user.id);
     await sendPasswordResetEmail(user.email, user.name, token).catch(() => {});
   }
@@ -117,7 +117,7 @@ router.post('/reset-password', async (req, res) => {
   }
 
   const hash = await bcrypt.hash(password, 12);
-  db.prepare('UPDATE users SET password_hash = ?, pw_version = pw_version + 1, reset_token = NULL, reset_expires = NULL, updated_at = datetime("now") WHERE id = ?')
+  db.prepare('UPDATE users SET password_hash = ?, pw_version = pw_version + 1, reset_token = NULL, reset_expires = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
     .run(hash, user.id);
   res.json({ message: 'Password updated.' });
 });
@@ -140,7 +140,7 @@ router.post('/change-password', requireAuth, async (req, res) => {
   if (!valid) return res.status(401).json({ error: 'Current password incorrect' });
 
   const hash = await bcrypt.hash(new_password, 12);
-  db.prepare('UPDATE users SET password_hash = ?, pw_version = pw_version + 1, updated_at = datetime("now") WHERE id = ?').run(hash, user.id);
+  db.prepare('UPDATE users SET password_hash = ?, pw_version = pw_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(hash, user.id);
   res.json({ message: 'Password updated. Please log in again.' });
 });
 

@@ -35,8 +35,8 @@ router.post('/:id/approve', requireRole('admin'), async (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   const assignedRole = role || user.role;
-  db.prepare('UPDATE users SET approved = 1, role = ?, updated_at = datetime("now") WHERE id = ?').run(assignedRole, user.id);
-  db.prepare('UPDATE account_requests SET status = "approved", reviewed_by = ?, reviewed_at = datetime("now") WHERE email = ? AND status = "pending"')
+  db.prepare('UPDATE users SET approved = 1, role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(assignedRole, user.id);
+  db.prepare('UPDATE account_requests SET status = "approved", reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE email = ? AND status = "pending"')
     .run(req.user.id, user.email);
 
   await sendApprovalEmail(user.email, user.name).catch(() => {});
@@ -48,7 +48,7 @@ router.post('/:id/reject', requireRole('admin'), (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  db.prepare('UPDATE account_requests SET status = "rejected", reviewed_by = ?, reviewed_at = datetime("now") WHERE email = ? AND status = "pending"')
+  db.prepare('UPDATE account_requests SET status = "rejected", reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE email = ? AND status = "pending"')
     .run(req.user.id, user.email);
   res.json({ message: 'Request rejected' });
 });
@@ -59,7 +59,7 @@ router.patch('/:id/role', requireRole('admin'), (req, res) => {
   const validRoles = ['admin','bylaws_chair','senate_manager','ec_member','provost_office','unit_submitter','read_only'];
   if (!validRoles.includes(role)) return res.status(400).json({ error: 'Invalid role' });
 
-  db.prepare('UPDATE users SET role = ?, updated_at = datetime("now") WHERE id = ?').run(role, req.params.id);
+  db.prepare('UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(role, req.params.id);
   res.json({ message: 'Role updated' });
 });
 
@@ -72,7 +72,7 @@ router.post('/:id/reset-password', requireRole('admin'), async (req, res) => {
   }
 
   const hash = await bcrypt.hash(new_password, 12);
-  db.prepare('UPDATE users SET password_hash = ?, pw_version = pw_version + 1, updated_at = datetime("now") WHERE id = ?').run(hash, req.params.id);
+  db.prepare('UPDATE users SET password_hash = ?, pw_version = pw_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(hash, req.params.id);
   res.json({ message: 'Password reset — user sessions invalidated' });
 });
 

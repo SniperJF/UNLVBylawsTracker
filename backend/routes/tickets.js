@@ -123,7 +123,7 @@ router.patch('/:id', (req, res) => {
     if (req.body[key] !== undefined) { updates.push(`${key} = ?`); vals.push(req.body[key]); }
   }
   if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
-  updates.push('updated_at = datetime("now")');
+  updates.push('updated_at = CURRENT_TIMESTAMP');
   vals.push(req.params.id);
   db.prepare(`UPDATE tickets SET ${updates.join(', ')} WHERE id = ?`).run(...vals);
   res.json({ message: 'Updated' });
@@ -146,7 +146,7 @@ router.post('/:id/advance', requireRole(...MOVER_ROLES), (req, res) => {
   db.prepare('INSERT INTO ticket_phase_history (ticket_id, phase, entered_by) VALUES (?, ?, ?)').run(ticket.id, next_phase, req.user.id);
 
   const newStatus = next_phase === 'PUBLISHED' ? 'published' : 'active';
-  db.prepare('UPDATE tickets SET current_phase = ?, status = ?, updated_at = datetime("now") WHERE id = ?').run(next_phase, newStatus, ticket.id);
+  db.prepare('UPDATE tickets SET current_phase = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(next_phase, newStatus, ticket.id);
 
   if (ticket.originator_id) {
     createNotification(ticket.originator_id, 'phase_change', `"${ticket.title}" moved to ${next_phase}`, ticket.id);
@@ -164,7 +164,7 @@ router.post('/:id/stuck', requireRole(...MOVER_ROLES), (req, res) => {
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
 
   const newStatus = ticket.status === 'stuck' ? 'active' : 'stuck';
-  db.prepare('UPDATE tickets SET status = ?, updated_at = datetime("now") WHERE id = ?').run(newStatus, ticket.id);
+  db.prepare('UPDATE tickets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newStatus, ticket.id);
 
   if (ticket.originator_id) {
     createNotification(ticket.originator_id, 'stuck_change', `"${ticket.title}" marked ${newStatus}`, ticket.id);
@@ -186,7 +186,7 @@ router.post('/:id/phase', requireRole('admin','bylaws_chair','senate_manager'), 
   db.prepare('INSERT INTO ticket_phase_history (ticket_id, phase, entered_by) VALUES (?, ?, ?)').run(ticket.id, phase, req.user.id);
 
   const newStatus = phase === 'PUBLISHED' ? 'published' : ticket.status === 'published' ? 'active' : ticket.status;
-  db.prepare('UPDATE tickets SET current_phase = ?, status = ?, updated_at = datetime("now") WHERE id = ?').run(phase, newStatus, ticket.id);
+  db.prepare('UPDATE tickets SET current_phase = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(phase, newStatus, ticket.id);
   res.json({ message: 'Phase set', new_phase: phase });
 });
 
