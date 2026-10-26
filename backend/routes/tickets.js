@@ -30,7 +30,10 @@ router.get('/', (req, res) => {
       u1.name as originator_name, u1.email as originator_email,
       u2.name as assignee_name, u2.email as assignee_email,
       (SELECT COUNT(*) FROM comments WHERE ticket_id = t.id) as comment_count,
-      (SELECT COUNT(*) FROM ticket_attachments WHERE ticket_id = t.id) as attachment_count
+      (SELECT COUNT(*) FROM ticket_attachments WHERE ticket_id = t.id) as attachment_count,
+      (SELECT entered_at FROM ticket_phase_history
+       WHERE ticket_id = t.id AND phase = t.current_phase AND exited_at IS NULL
+       ORDER BY entered_at DESC LIMIT 1) as current_phase_entered_at
     FROM tickets t
     LEFT JOIN users u1 ON t.originator_id = u1.id
     LEFT JOIN users u2 ON t.assignee_id = u2.id
