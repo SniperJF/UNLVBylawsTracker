@@ -11,11 +11,11 @@ const router = express.Router();
 
 // Brute-force protection on login and forgot-password
 const authLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,
-  max: 12,
+  windowMs: 15 * 60 * 1000,
+  max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many attempts — try again in 5 minutes' },
+  message: { error: 'Too many attempts — try again in 15 minutes' },
   skipSuccessfulRequests: true,
 });
 
