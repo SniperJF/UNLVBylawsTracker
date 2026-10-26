@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verify Email — UNLV Bylaws Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-box" style="text-align:center;">
+    <div class="auth-logo">
+      <svg viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="10" fill="#cf0a2c"/><text x="24" y="32" font-family="serif" font-size="20" font-weight="bold" fill="white" text-anchor="middle">U</text></svg>
+    </div>
+    <div id="status-area"><div class="spinner" style="margin:20px auto;"></div><div class="text-muted mt-2">Verifying…</div></div>
+  </div>
+</div>
+<script src="js/api.js"></script>
+<script>
+const token = new URLSearchParams(location.search).get('token');
+const el = document.getElementById('status-area');
+if (!token) {
+  el.innerHTML = '<div class="alert alert-error">Invalid link.</div>';
+} else {
+  fetch('/BylawsTracker/api/auth/verify?token=' + encodeURIComponent(token))
+    .then(r => r.json())
+    .then(d => {
+      if (d.message) el.innerHTML = `<div class="alert alert-success">${d.message}</div><a href="login.html" class="btn btn-primary mt-3" style="margin-top:12px;">Go to Login</a>`;
+      else el.innerHTML = `<div class="alert alert-error">${d.error || 'Verification failed.'}</div>`;
+    }).catch(() => { el.innerHTML = '<div class="alert alert-error">Network error.</div>'; });
+}
+</script>
+</body>
+</html>

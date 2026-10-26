@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — UNLV Bylaws Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/main.css">
+<style>
+.view-toggle { display: flex; gap: 4px; }
+.view-toggle button { background: var(--panel); border: 1px solid var(--border); color: var(--muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-family: var(--font); font-size: 0.85rem; }
+.view-toggle button.active { background: var(--scarlet); color: white; border-color: var(--scarlet); }
+.list-table tr { cursor: pointer; }
+.track-header { font-size: 0.75rem; font-family: var(--mono); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--scarlet); padding: 6px 0 12px; }
+</style>
+</head>
+<body class="app-layout">
+
+<!-- Nav -->
+<nav class="topnav">
+  <div class="topnav-inner">
+    <a href="dashboard.html" class="nav-brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="5" fill="#cf0a2c"/><text x="12" y="17" font-family="serif" font-size="12" font-weight="bold" fill="white" text-anchor="middle">U</text></svg>
+      Bylaws Tracker<span class="dot">.</span>
+    </a>
+    <div class="nav-links">
+      <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+      <a href="new-ticket.html" data-page="new">+ New Ticket</a>
+      <a href="admin.html" data-page="admin" data-admin>Admin</a>
+    </div>
+    <div class="nav-right">
+      <a href="notifications.html" class="notif-btn" title="Notifications">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="badge hidden" id="notif-badge"></span>
+      </a>
+      <div class="user-menu">
+        <button class="user-btn" id="user-btn">
+          <span id="nav-user-name"></span>
+          <span class="role-tag" id="nav-role"></span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="user-dropdown" id="user-dropdown">
+          <a href="profile.html">Change Password</a>
+          <button class="danger" id="logout-btn">Sign Out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="page-header flex justify-between items-center">
+    <div>
+      <div class="section-title">Bylaws Dashboard</div>
+      <div class="section-sub">All amendment and unit bylaws tickets</div>
+    </div>
+    <div class="flex gap-2">
+      <div class="view-toggle">
+        <button id="view-kanban" class="active">Kanban</button>
+        <button id="view-list">List</button>
+      </div>
+      <a href="new-ticket.html" class="btn btn-primary btn-sm">+ New</a>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <select id="filter-type">
+      <option value="">All Types</option>
+      <option value="university_amendment">University Amendment</option>
+      <option value="unit_bylaws">Unit Bylaws</option>
+    </select>
+    <select id="filter-status">
+      <option value="">All Statuses</option>
+      <option value="active">Active</option>
+      <option value="stuck">Stuck</option>
+      <option value="published">Published</option>
+    </select>
+    <input type="text" id="filter-search" placeholder="Search title…" style="min-width:200px;">
+    <button class="btn btn-secondary btn-sm" id="clear-filters">Clear</button>
+  </div>
+
+  <!-- Kanban view -->
+  <div id="kanban-view">
+    <div class="track-header">Track A — University Bylaws Amendments</div>
+    <div class="kanban-board" id="board-a"></div>
+    <div class="track-header" style="margin-top:32px;">Track B — Unit Bylaws</div>
+    <div class="kanban-board" id="board-b"></div>
+  </div>
+
+  <!-- List view -->
+  <div id="list-view" class="hidden">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Title</th><th>Type</th><th>Phase</th><th>Status</th><th>Assignee</th><th>Updated</th>
+        </tr></thead>
+        <tbody id="list-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="loading" style="text-align:center;padding:40px;"><div class="spinner" style="margin:auto;"></div></div>
+  <div id="empty-state" class="hidden" style="text-align:center;padding:60px;color:var(--muted);">
+    <div style="font-size:2rem;">📋</div>
+    <div style="margin-top:8px;">No tickets found. <a href="new-ticket.html" style="color:var(--scarlet);">Create one</a></div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+requireLogin();
+renderNav('dashboard');
+
+const TRACK_A = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','GENERAL_COUNSEL','PROVOST_REVIEW','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
+const TRACK_B = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PROVOST_REVIEW','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
+
+let allTickets = [];
+
+// User menu
+document.getElementById('user-btn').addEventListener('click', () => {
+  document.getElementById('user-dropdown').classList.toggle('open');
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('.user-menu')) document.getElementById('user-dropdown').classList.remove('open');
+});
+document.getElementById('logout-btn').addEventListener('click', () => { clearAuth(); window.location.href = 'login.html'; });
+
+// View toggle
+const kanbanView = document.getElementById('kanban-view');
+const listView = document.getElementById('list-view');
+document.getElementById('view-kanban').addEventListener('click', () => {
+  kanbanView.classList.remove('hidden'); listView.classList.add('hidden');
+  document.getElementById('view-kanban').classList.add('active');
+  document.getElementById('view-list').classList.remove('active');
+});
+document.getElementById('view-list').addEventListener('click', () => {
+  listView.classList.remove('hidden'); kanbanView.classList.add('hidden');
+  document.getElementById('view-list').classList.add('active');
+  document.getElementById('view-kanban').classList.remove('active');
+});
+
+// Filters
+['filter-type','filter-status'].forEach(id => document.getElementById(id).addEventListener('change', render));
+document.getElementById('filter-search').addEventListener('input', render);
+document.getElementById('clear-filters').addEventListener('click', () => {
+  document.getElementById('filter-type').value = '';
+  document.getElementById('filter-status').value = '';
+  document.getElementById('filter-search').value = '';
+  render();
+});
+
+function filteredTickets() {
+  const type = document.getElementById('filter-type').value;
+  const status = document.getElementById('filter-status').value;
+  const q = document.getElementById('filter-search').value.toLowerCase();
+  return allTickets.filter(t =>
+    (!type || t.type === type) &&
+    (!status || t.status === status) &&
+    (!q || t.title.toLowerCase().includes(q))
+  );
+}
+
+function render() {
+  const tickets = filteredTickets();
+  const loading = document.getElementById('loading');
+  const empty = document.getElementById('empty-state');
+  loading.classList.add('hidden');
+
+  if (tickets.length === 0) { empty.classList.remove('hidden'); document.getElementById('board-a').innerHTML = ''; document.getElementById('board-b').innerHTML = ''; document.getElementById('list-body').innerHTML = ''; return; }
+  empty.classList.add('hidden');
+
+  renderKanban(tickets);
+  renderList(tickets);
+}
+
+function renderKanban(tickets) {
+  const byPhaseA = {};
+  const byPhaseB = {};
+  TRACK_A.forEach(p => byPhaseA[p] = []);
+  TRACK_B.forEach(p => byPhaseB[p] = []);
+
+  tickets.forEach(t => {
+    if (t.type === 'university_amendment') {
+      if (byPhaseA[t.current_phase]) byPhaseA[t.current_phase].push(t);
+    } else {
+      if (byPhaseB[t.current_phase]) byPhaseB[t.current_phase].push(t);
+    }
+  });
+
+  document.getElementById('board-a').innerHTML = TRACK_A.map(phase => colHTML(phase, byPhaseA[phase] || [])).join('');
+  document.getElementById('board-b').innerHTML = TRACK_B.map(phase => colHTML(phase, byPhaseB[phase] || [])).join('');
+}
+
+function colHTML(phase, cards) {
+  return `
+    <div class="kanban-col">
+      <div class="kanban-col-header">
+        <span class="kanban-col-title">${phase.replace(/_/g,' ')}</span>
+        <span class="kanban-count">${cards.length}</span>
+      </div>
+      ${cards.map(t => `
+        <a href="ticket.html?id=${t.id}" class="kanban-card ${t.status}">
+          <div class="kanban-card-title">${escHtml(t.title)}</div>
+          <div class="kanban-card-meta">
+            <span>${t.bylaws_section ? '§' + escHtml(t.bylaws_section) : ''}</span>
+            <span>${t.originator_name || ''}</span>
+            <span>${relativeTime(t.updated_at)}</span>
+          </div>
+          ${t.status === 'stuck' ? '<div style="margin-top:4px;font-size:0.75rem;color:var(--danger);font-weight:600;">⚠ STUCK</div>' : ''}
+        </a>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderList(tickets) {
+  document.getElementById('list-body').innerHTML = tickets.map(t => `
+    <tr onclick="window.location='ticket.html?id=${t.id}'">
+      <td><strong>${escHtml(t.title)}</strong>${t.bylaws_section ? `<br><span class="text-xs text-muted">§${escHtml(t.bylaws_section)}</span>` : ''}</td>
+      <td><span style="font-size:0.78rem;color:var(--muted);">${t.type === 'university_amendment' ? 'Univ. Amendment' : 'Unit Bylaws'}</span></td>
+      <td><span class="font-mono text-xs">${t.current_phase.replace(/_/g,' ')}</span></td>
+      <td>${statusBadge(t.status, t.current_phase)}</td>
+      <td>${t.assignee_name || '<span class="text-muted">—</span>'}</td>
+      <td class="text-muted text-sm">${relativeTime(t.updated_at)}</td>
+    </tr>
+  `).join('');
+}
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Load tickets
+async function loadTickets() {
+  try {
+    allTickets = await apiFetch('/tickets');
+    render();
+  } catch (err) {
+    document.getElementById('loading').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+}
+
+loadTickets();
+</script>
+</body>
+</html>

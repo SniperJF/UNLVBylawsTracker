@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — UNLV Bylaws Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/main.css">
+<style>
+.tab-bar { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.tab { padding: 10px 16px; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 0.9rem; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; font-family: var(--font); transition: color 0.15s; }
+.tab.active { color: var(--text); border-bottom-color: var(--scarlet); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+</style>
+</head>
+<body class="app-layout">
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <a href="dashboard.html" class="nav-brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="5" fill="#cf0a2c"/><text x="12" y="17" font-family="serif" font-size="12" font-weight="bold" fill="white" text-anchor="middle">U</text></svg>
+      Bylaws Tracker<span class="dot">.</span>
+    </a>
+    <div class="nav-links">
+      <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+      <a href="new-ticket.html" data-page="new">+ New Ticket</a>
+      <a href="admin.html" data-page="admin">Admin</a>
+    </div>
+    <div class="nav-right">
+      <a href="notifications.html" class="notif-btn" title="Notifications">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="badge hidden" id="notif-badge"></span>
+      </a>
+      <div class="user-menu">
+        <button class="user-btn" id="user-btn">
+          <span id="nav-user-name"></span>
+          <span class="role-tag" id="nav-role"></span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="user-dropdown" id="user-dropdown">
+          <a href="profile.html">Change Password</a>
+          <button class="danger" id="logout-btn">Sign Out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="page-header">
+    <div class="section-title">Admin Panel</div>
+    <div class="section-sub">User management and account requests</div>
+  </div>
+
+  <div id="alert-area"></div>
+
+  <div class="tab-bar">
+    <button class="tab active" data-tab="requests">Pending Requests <span id="req-count" style="background:var(--scarlet);color:white;padding:1px 7px;border-radius:10px;font-size:0.75rem;margin-left:4px;"></span></button>
+    <button class="tab" data-tab="users">All Users</button>
+  </div>
+
+  <!-- Pending Requests -->
+  <div class="tab-panel active" id="tab-requests">
+    <div id="requests-list"><div class="spinner" style="margin:20px auto;display:block;"></div></div>
+  </div>
+
+  <!-- All Users -->
+  <div class="tab-panel" id="tab-users">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="users-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Reset password modal -->
+<div id="reset-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:300;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;max-width:400px;width:90%;">
+    <div style="font-size:1.1rem;font-weight:700;margin-bottom:16px;">Reset Password for <span id="reset-name"></span></div>
+    <div id="reset-alert"></div>
+    <div class="form-group">
+      <label>New Password</label>
+      <input type="password" class="form-control" id="reset-pw" placeholder="Min 8 characters">
+    </div>
+    <div class="flex gap-2 mt-3">
+      <button class="btn btn-primary" id="reset-confirm">Set Password</button>
+      <button class="btn btn-secondary" id="reset-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+requireLogin();
+requireAdmin();
+renderNav('admin');
+
+document.getElementById('user-btn').addEventListener('click', () => document.getElementById('user-dropdown').classList.toggle('open'));
+document.addEventListener('click', e => { if (!e.target.closest('.user-menu')) document.getElementById('user-dropdown').classList.remove('open'); });
+document.getElementById('logout-btn').addEventListener('click', () => { clearAuth(); window.location.href = 'login.html'; });
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'users') loadUsers();
+  });
+});
+
+const ROLES = ['admin','bylaws_chair','senate_manager','ec_member','provost_office','unit_submitter','read_only'];
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function loadRequests() {
+  try {
+    const requests = await apiFetch('/users/requests');
+    const el = document.getElementById('requests-list');
+    const countEl = document.getElementById('req-count');
+    countEl.textContent = requests.length;
+    countEl.style.display = requests.length ? 'inline' : 'none';
+
+    if (!requests.length) { el.innerHTML = '<div class="text-muted" style="padding:20px;">No pending requests.</div>'; return; }
+
+    el.innerHTML = requests.map(r => `
+      <div class="card" style="margin-bottom:12px;">
+        <div class="flex justify-between items-center">
+          <div>
+            <div style="font-weight:600;">${escHtml(r.name)}</div>
+            <div class="text-sm text-muted">${escHtml(r.email)}</div>
+            <div class="text-xs text-muted mt-1">Requested: <strong>${r.role_requested.replace(/_/g,' ')}</strong>${r.reason ? ` · "${escHtml(r.reason)}"` : ''}</div>
+            <div class="text-xs" style="margin-top:4px;">
+              Email: ${r.email_verified ? '✓ verified' : '✗ not verified'}
+            </div>
+          </div>
+          <div class="flex gap-2 items-center">
+            <select class="form-control" id="role-sel-${r.id}" style="font-size:0.85rem;padding:6px 10px;">
+              ${ROLES.map(role => `<option value="${role}" ${role === r.role_requested ? 'selected' : ''}>${role.replace(/_/g,' ')}</option>`).join('')}
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="approveUser(${r.id})">Approve</button>
+            <button class="btn btn-danger btn-sm" onclick="rejectUser(${r.id})">Reject</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    document.getElementById('requests-list').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+}
+
+async function approveUser(id) {
+  const role = document.getElementById(`role-sel-${id}`)?.value;
+  try {
+    await apiFetch(`/users/${id}/approve`, { method: 'POST', body: JSON.stringify({ role }) });
+    showAlert('User approved!', 'success');
+    loadRequests();
+  } catch (err) { showAlert(err.message, 'error'); }
+}
+
+async function rejectUser(id) {
+  if (!confirm('Reject this request?')) return;
+  try {
+    await apiFetch(`/users/${id}/reject`, { method: 'POST' });
+    showAlert('Request rejected.', 'success');
+    loadRequests();
+  } catch (err) { showAlert(err.message, 'error'); }
+}
+
+async function loadUsers() {
+  try {
+    const users = await apiFetch('/users');
+    document.getElementById('users-body').innerHTML = users.map(u => `
+      <tr>
+        <td><strong>${escHtml(u.name)}</strong></td>
+        <td class="text-sm">${escHtml(u.email)}</td>
+        <td>
+          <select class="form-control" id="urole-${u.id}" style="font-size:0.82rem;padding:5px 8px;" onchange="changeRole(${u.id})">
+            ${ROLES.map(r => `<option value="${r}" ${r === u.role ? 'selected' : ''}>${r.replace(/_/g,' ')}</option>`).join('')}
+          </select>
+        </td>
+        <td>${u.approved ? '<span class="text-success text-sm">Active</span>' : '<span class="text-warning text-sm">Pending</span>'}</td>
+        <td>
+          <div class="flex gap-2">
+            ${!u.approved ? `<button class="btn btn-primary btn-sm" onclick="approveUserDirect(${u.id})">Approve</button>` : ''}
+            <button class="btn btn-secondary btn-sm" onclick="openReset(${u.id}, '${escHtml(u.name)}')">Reset PW</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    document.getElementById('users-body').innerHTML = `<tr><td colspan="5"><div class="alert alert-error">${err.message}</div></td></tr>`;
+  }
+}
+
+async function changeRole(id) {
+  const role = document.getElementById(`urole-${id}`)?.value;
+  try {
+    await apiFetch(`/users/${id}/role`, { method: 'PATCH', body: JSON.stringify({ role }) });
+    showAlert('Role updated.', 'success');
+  } catch (err) { showAlert(err.message, 'error'); }
+}
+
+async function approveUserDirect(id) {
+  const role = document.getElementById(`urole-${id}`)?.value;
+  try {
+    await apiFetch(`/users/${id}/approve`, { method: 'POST', body: JSON.stringify({ role }) });
+    showAlert('User approved!', 'success');
+    loadUsers();
+  } catch (err) { showAlert(err.message, 'error'); }
+}
+
+let resetUserId = null;
+function openReset(id, name) {
+  resetUserId = id;
+  document.getElementById('reset-name').textContent = name;
+  document.getElementById('reset-pw').value = '';
+  document.getElementById('reset-alert').innerHTML = '';
+  document.getElementById('reset-modal').style.display = 'flex';
+}
+document.getElementById('reset-cancel').addEventListener('click', () => { document.getElementById('reset-modal').style.display = 'none'; });
+document.getElementById('reset-confirm').addEventListener('click', async () => {
+  const pw = document.getElementById('reset-pw').value;
+  if (!pw || pw.length < 8) { document.getElementById('reset-alert').innerHTML = '<div class="alert alert-error">Min 8 characters</div>'; return; }
+  try {
+    await apiFetch(`/users/${resetUserId}/reset-password`, { method: 'POST', body: JSON.stringify({ new_password: pw }) });
+    document.getElementById('reset-modal').style.display = 'none';
+    showAlert('Password reset.', 'success');
+  } catch (err) { document.getElementById('reset-alert').innerHTML = `<div class="alert alert-error">${err.message}</div>`; }
+});
+
+function showAlert(msg, type) {
+  document.getElementById('alert-area').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  setTimeout(() => { document.getElementById('alert-area').innerHTML = ''; }, 4000);
+}
+
+loadRequests();
+</script>
+</body>
+</html>

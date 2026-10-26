@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — UNLV Bylaws Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="48" height="48" rx="10" fill="#cf0a2c"/>
+        <text x="24" y="32" font-family="serif" font-size="20" font-weight="bold" fill="white" text-anchor="middle">U</text>
+      </svg>
+    </div>
+    <div class="auth-title">Bylaws Tracker</div>
+    <div class="auth-sub">UNLV Faculty Senate</div>
+
+    <div id="alert-area"></div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label>UNLV Email</label>
+        <input type="email" class="form-control" id="email" placeholder="you@unlv.edu" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" class="form-control" id="password" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary w-full" id="submit-btn">Sign In</button>
+    </form>
+
+    <div class="auth-footer" style="margin-top:16px;">
+      <a href="#" id="forgot-link">Forgot password?</a>
+    </div>
+    <div class="auth-footer">
+      No account? <a href="register.html">Request access</a>
+    </div>
+  </div>
+</div>
+
+<!-- Forgot password modal -->
+<div id="forgot-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:300;display:none;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;max-width:400px;width:90%;">
+    <div style="font-size:1.1rem;font-weight:700;margin-bottom:16px;">Reset Password</div>
+    <div id="forgot-alert"></div>
+    <div class="form-group">
+      <label>UNLV Email</label>
+      <input type="email" class="form-control" id="forgot-email" placeholder="you@unlv.edu">
+    </div>
+    <div class="flex gap-2 mt-3">
+      <button class="btn btn-primary" id="forgot-submit">Send Reset Link</button>
+      <button class="btn btn-secondary" id="forgot-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+// Redirect if already logged in
+if (getToken()) window.location.href = 'dashboard.html';
+
+const form = document.getElementById('login-form');
+const alertArea = document.getElementById('alert-area');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  alertArea.innerHTML = '';
+
+  try {
+    const data = await apiFetch('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: document.getElementById('email').value, password: document.getElementById('password').value })
+    });
+    setAuth(data.token, data.user);
+    window.location.href = 'dashboard.html';
+  } catch (err) {
+    alertArea.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  }
+});
+
+// Forgot password
+const forgotModal = document.getElementById('forgot-modal');
+document.getElementById('forgot-link').addEventListener('click', e => { e.preventDefault(); forgotModal.style.display = 'flex'; });
+document.getElementById('forgot-cancel').addEventListener('click', () => { forgotModal.style.display = 'none'; });
+document.getElementById('forgot-submit').addEventListener('click', async () => {
+  const email = document.getElementById('forgot-email').value;
+  const alertEl = document.getElementById('forgot-alert');
+  try {
+    await apiFetch('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
+    alertEl.innerHTML = '<div class="alert alert-success">If that email is registered, a reset link was sent.</div>';
+  } catch (err) {
+    alertEl.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+});
+</script>
+</body>
+</html>

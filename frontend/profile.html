@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profile — UNLV Bylaws Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body class="app-layout">
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <a href="dashboard.html" class="nav-brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="5" fill="#cf0a2c"/><text x="12" y="17" font-family="serif" font-size="12" font-weight="bold" fill="white" text-anchor="middle">U</text></svg>
+      Bylaws Tracker<span class="dot">.</span>
+    </a>
+    <div class="nav-links">
+      <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+      <a href="new-ticket.html">+ New Ticket</a>
+      <a href="admin.html" data-admin>Admin</a>
+    </div>
+    <div class="nav-right">
+      <a href="notifications.html" class="notif-btn" title="Notifications">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="badge hidden" id="notif-badge"></span>
+      </a>
+      <div class="user-menu">
+        <button class="user-btn" id="user-btn">
+          <span id="nav-user-name"></span>
+          <span class="role-tag" id="nav-role"></span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="user-dropdown" id="user-dropdown">
+          <a href="profile.html">Change Password</a>
+          <button class="danger" id="logout-btn">Sign Out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div style="max-width:480px;margin:0 auto;">
+    <div class="page-header">
+      <div class="section-title">Account Settings</div>
+    </div>
+
+    <div class="card mb-4" id="profile-info"></div>
+
+    <div class="card">
+      <div style="font-weight:600;margin-bottom:16px;">Change Password</div>
+      <div id="pw-alert"></div>
+      <form id="pw-form">
+        <div class="form-group">
+          <label>Current Password</label>
+          <input type="password" class="form-control" id="current-pw" required>
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" class="form-control" id="new-pw" required minlength="8" placeholder="Min 8 characters">
+        </div>
+        <div class="form-group">
+          <label>Confirm New Password</label>
+          <input type="password" class="form-control" id="confirm-pw" required>
+        </div>
+        <button type="submit" class="btn btn-primary" id="pw-btn">Update Password</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+requireLogin();
+renderNav();
+
+document.getElementById('user-btn').addEventListener('click', () => document.getElementById('user-dropdown').classList.toggle('open'));
+document.addEventListener('click', e => { if (!e.target.closest('.user-menu')) document.getElementById('user-dropdown').classList.remove('open'); });
+document.getElementById('logout-btn').addEventListener('click', () => { clearAuth(); window.location.href = 'login.html'; });
+
+const user = getUser();
+document.getElementById('profile-info').innerHTML = `
+  <div style="display:grid;gap:12px;">
+    <div><div class="text-xs text-muted">Name</div><div class="mt-1">${user?.name || ''}</div></div>
+    <div><div class="text-xs text-muted">Email</div><div class="mt-1">${user?.email || ''}</div></div>
+    <div><div class="text-xs text-muted">Role</div><div class="mt-1"><span class="role-tag">${(user?.role||'').replace(/_/g,' ')}</span></div></div>
+  </div>
+`;
+
+document.getElementById('pw-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const newPw = document.getElementById('new-pw').value;
+  const confirmPw = document.getElementById('confirm-pw').value;
+  const alertEl = document.getElementById('pw-alert');
+  if (newPw !== confirmPw) { alertEl.innerHTML = '<div class="alert alert-error">Passwords do not match.</div>'; return; }
+  const btn = document.getElementById('pw-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await apiFetch('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: document.getElementById('current-pw').value, new_password: newPw })
+    });
+    alertEl.innerHTML = '<div class="alert alert-success">Password updated!</div>';
+    document.getElementById('pw-form').reset();
+  } catch (err) {
+    alertEl.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+  btn.disabled = false; btn.textContent = 'Update Password';
+});
+</script>
+</body>
+</html>

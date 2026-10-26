@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notifications — UNLV Bylaws Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body class="app-layout">
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <a href="dashboard.html" class="nav-brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="5" fill="#cf0a2c"/><text x="12" y="17" font-family="serif" font-size="12" font-weight="bold" fill="white" text-anchor="middle">U</text></svg>
+      Bylaws Tracker<span class="dot">.</span>
+    </a>
+    <div class="nav-links">
+      <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+      <a href="new-ticket.html" data-page="new">+ New Ticket</a>
+      <a href="admin.html" data-page="admin" data-admin>Admin</a>
+    </div>
+    <div class="nav-right">
+      <a href="notifications.html" class="notif-btn" title="Notifications">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="badge hidden" id="notif-badge"></span>
+      </a>
+      <div class="user-menu">
+        <button class="user-btn" id="user-btn">
+          <span id="nav-user-name"></span>
+          <span class="role-tag" id="nav-role"></span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="user-dropdown" id="user-dropdown">
+          <a href="profile.html">Change Password</a>
+          <button class="danger" id="logout-btn">Sign Out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div style="max-width:720px;margin:0 auto;">
+    <div class="page-header flex justify-between items-center">
+      <div>
+        <div class="section-title">Notifications</div>
+        <div class="section-sub">Activity on your tickets</div>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn btn-secondary btn-sm" id="mark-all-read">Mark All Read</button>
+        <button class="btn btn-danger btn-sm" id="clear-all">Clear All</button>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden;" id="notif-container">
+      <div style="text-align:center;padding:40px;"><div class="spinner" style="margin:auto;"></div></div>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+requireLogin();
+renderNav('notifications');
+
+document.getElementById('user-btn').addEventListener('click', () => document.getElementById('user-dropdown').classList.toggle('open'));
+document.addEventListener('click', e => { if (!e.target.closest('.user-menu')) document.getElementById('user-dropdown').classList.remove('open'); });
+document.getElementById('logout-btn').addEventListener('click', () => { clearAuth(); window.location.href = 'login.html'; });
+
+function typeIcon(type) {
+  if (type === 'comment') return '💬';
+  if (type === 'phase_change') return '→';
+  if (type === 'stuck_change') return '⚠';
+  return '🔔';
+}
+
+async function loadNotifications() {
+  try {
+    const notifs = await apiFetch('/notifications');
+    const el = document.getElementById('notif-container');
+    if (!notifs.length) {
+      el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">No notifications</div>';
+      return;
+    }
+    el.innerHTML = notifs.map(n => `
+      <div class="notif-item ${n.read ? '' : 'unread'}" data-id="${n.id}">
+        ${!n.read ? '<div class="notif-dot"></div>' : '<div style="width:8px;flex-shrink:0;"></div>'}
+        <div class="notif-body">
+          <div class="notif-msg">
+            <span style="margin-right:6px;">${typeIcon(n.type)}</span>
+            ${escHtml(n.message)}
+            ${n.ticket_id ? `<a href="ticket.html?id=${n.ticket_id}" style="color:var(--scarlet);margin-left:4px;text-decoration:none;">View ticket →</a>` : ''}
+          </div>
+          <div class="notif-time">${relativeTime(n.created_at)}</div>
+        </div>
+        ${!n.read ? `<button class="btn btn-secondary btn-sm" onclick="markRead(${n.id}, this)">Read</button>` : ''}
+      </div>
+    `).join('');
+  } catch (err) {
+    document.getElementById('notif-container').innerHTML = `<div class="alert alert-error m-4">${err.message}</div>`;
+  }
+}
+
+async function markRead(id, btn) {
+  btn.disabled = true;
+  await apiFetch(`/notifications/${id}/read`, { method: 'PATCH' }).catch(() => {});
+  const item = document.querySelector(`[data-id="${id}"]`);
+  if (item) { item.classList.remove('unread'); btn.remove(); item.querySelector('.notif-dot')?.remove(); item.insertAdjacentHTML('afterbegin', '<div style="width:8px;flex-shrink:0;"></div>'); }
+  const count = document.querySelectorAll('.notif-item.unread').length;
+  updateBadge(count);
+}
+
+document.getElementById('mark-all-read').addEventListener('click', async () => {
+  await apiFetch('/notifications/mark-all-read', { method: 'POST' }).catch(() => {});
+  await loadNotifications();
+  updateBadge(0);
+});
+
+document.getElementById('clear-all').addEventListener('click', async () => {
+  if (!confirm('Clear all notifications?')) return;
+  await apiFetch('/notifications', { method: 'DELETE' }).catch(() => {});
+  await loadNotifications();
+  updateBadge(0);
+});
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+loadNotifications();
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+node_modules/
+backend/.env
+bylaws.db
+uploads/
+*.log
+.DS_Store

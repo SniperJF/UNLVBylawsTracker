@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ticket — UNLV Bylaws Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/main.css">
+<style>
+.ticket-grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
+@media (max-width: 768px) { .ticket-grid { grid-template-columns: 1fr; } }
+.comment { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.comment:last-child { border-bottom: none; }
+.comment-author { font-weight: 600; font-size: 0.88rem; }
+.comment-time { font-size: 0.78rem; color: var(--muted); margin-left: 8px; }
+.comment-body { margin-top: 6px; font-size: 0.9rem; line-height: 1.55; white-space: pre-wrap; }
+.attach-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+.attach-item:last-child { border-bottom: none; }
+.attach-icon { width: 32px; height: 32px; border-radius: 6px; background: var(--panel); display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+.deadline-banner { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 0.88rem; color: #fca5a5; }
+</style>
+</head>
+<body class="app-layout">
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <a href="dashboard.html" class="nav-brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="5" fill="#cf0a2c"/><text x="12" y="17" font-family="serif" font-size="12" font-weight="bold" fill="white" text-anchor="middle">U</text></svg>
+      Bylaws Tracker<span class="dot">.</span>
+    </a>
+    <div class="nav-links">
+      <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+      <a href="new-ticket.html" data-page="new">+ New Ticket</a>
+      <a href="admin.html" data-page="admin" data-admin>Admin</a>
+    </div>
+    <div class="nav-right">
+      <a href="notifications.html" class="notif-btn" title="Notifications">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="badge hidden" id="notif-badge"></span>
+      </a>
+      <div class="user-menu">
+        <button class="user-btn" id="user-btn">
+          <span id="nav-user-name"></span>
+          <span class="role-tag" id="nav-role"></span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="user-dropdown" id="user-dropdown">
+          <a href="profile.html">Change Password</a>
+          <button class="danger" id="logout-btn">Sign Out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div id="loading" style="text-align:center;padding:60px;"><div class="spinner" style="margin:auto;"></div></div>
+  <div id="ticket-content" class="hidden">
+    <div class="page-header flex justify-between items-center">
+      <div>
+        <a href="dashboard.html" class="text-muted text-sm" style="text-decoration:none;">← Dashboard</a>
+        <div class="section-title" id="ticket-title" style="margin-top:6px;"></div>
+        <div style="margin-top:6px;display:flex;align-items:center;gap:8px;">
+          <span id="ticket-status-badge"></span>
+          <span class="text-xs text-muted font-mono" id="ticket-type-label"></span>
+        </div>
+      </div>
+      <div class="flex gap-2" id="action-buttons"></div>
+    </div>
+
+    <div id="deadline-banner" class="hidden"></div>
+    <div id="alert-area"></div>
+
+    <div class="ticket-grid">
+      <!-- Main column -->
+      <div>
+        <!-- Description -->
+        <div class="card mb-4">
+          <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px;font-weight:600;">Description</div>
+          <div id="ticket-desc" style="font-size:0.95rem;line-height:1.6;white-space:pre-wrap;"></div>
+          <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;" id="ticket-meta-grid"></div>
+        </div>
+
+        <!-- Phase history -->
+        <div class="card mb-4">
+          <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:16px;font-weight:600;">Phase History</div>
+          <div class="timeline" id="phase-timeline"></div>
+        </div>
+
+        <!-- Attachments -->
+        <div class="card mb-4">
+          <div class="flex justify-between items-center" style="margin-bottom:12px;">
+            <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);font-weight:600;">Attachments</div>
+            <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+              + Upload
+              <input type="file" id="file-upload" multiple accept=".pdf,.docx,.doc,.txt,.png,.jpg" style="display:none;">
+            </label>
+          </div>
+          <div id="attachments-list"></div>
+        </div>
+
+        <!-- Comments -->
+        <div class="card">
+          <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:16px;font-weight:600;">Comments</div>
+          <div id="comments-list"></div>
+          <div style="margin-top:16px;">
+            <textarea class="form-control" id="comment-input" placeholder="Leave a comment…" style="min-height:80px;"></textarea>
+            <button class="btn btn-primary btn-sm" id="comment-submit" style="margin-top:8px;">Post Comment</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div>
+        <div class="card" style="margin-bottom:16px;">
+          <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:14px;font-weight:600;">Details</div>
+          <div id="sidebar-details"></div>
+        </div>
+        <div class="card" id="phase-actions" style="margin-bottom:16px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+requireLogin();
+renderNav('dashboard');
+
+document.getElementById('user-btn').addEventListener('click', () => document.getElementById('user-dropdown').classList.toggle('open'));
+document.addEventListener('click', e => { if (!e.target.closest('.user-menu')) document.getElementById('user-dropdown').classList.remove('open'); });
+document.getElementById('logout-btn').addEventListener('click', () => { clearAuth(); window.location.href = 'login.html'; });
+
+const TRACK_A = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','GENERAL_COUNSEL','PROVOST_REVIEW','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
+const TRACK_B = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PROVOST_REVIEW','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
+
+const ticketId = new URLSearchParams(location.search).get('id');
+if (!ticketId) window.location.href = 'dashboard.html';
+
+const user = getUser();
+let ticket;
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function daysSince(dateStr) {
+  if (!dateStr) return null;
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+}
+
+async function load() {
+  try {
+    ticket = await apiFetch(`/tickets/${ticketId}`);
+    render();
+  } catch (err) {
+    document.getElementById('loading').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+}
+
+function render() {
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('ticket-content').classList.remove('hidden');
+
+  document.title = `${ticket.title} — UNLV Bylaws Tracker`;
+  document.getElementById('ticket-title').textContent = ticket.title;
+  document.getElementById('ticket-status-badge').innerHTML = statusBadge(ticket.status, ticket.current_phase);
+  document.getElementById('ticket-type-label').textContent = ticket.type === 'university_amendment' ? 'Track A — University Amendment' : 'Track B — Unit Bylaws';
+  document.getElementById('ticket-desc').textContent = ticket.description || 'No description.';
+
+  // Deadline warnings
+  const deadlineBanner = document.getElementById('deadline-banner');
+  if (['PRESIDENT_REVIEW','CHANCELLOR_REVIEW'].includes(ticket.current_phase)) {
+    const phaseEntry = ticket.history?.find(h => h.phase === ticket.current_phase && !h.exited_at);
+    if (phaseEntry) {
+      const days = daysSince(phaseEntry.entered_at);
+      const limit = ticket.current_phase === 'PRESIDENT_REVIEW' ? 20 : 45;
+      const remaining = limit - days;
+      if (remaining <= 7) {
+        deadlineBanner.classList.remove('hidden');
+        deadlineBanner.innerHTML = `⚠ <strong>${ticket.current_phase.replace(/_/g,' ')} deadline:</strong> ${remaining <= 0 ? 'EXPIRED — Senate must re-vote' : `${remaining} day(s) remaining (${days}/${limit} days elapsed)`}`;
+      }
+    }
+  }
+
+  // Meta grid
+  document.getElementById('ticket-meta-grid').innerHTML = `
+    ${ticket.bylaws_section ? `<div><div class="text-xs text-muted">Section</div><div class="text-sm font-mono mt-1">§${escHtml(ticket.bylaws_section)}</div></div>` : ''}
+    ${ticket.unit_name ? `<div><div class="text-xs text-muted">Unit</div><div class="text-sm mt-1">${escHtml(ticket.unit_name)}</div></div>` : ''}
+    ${ticket.senate_meeting_date ? `<div><div class="text-xs text-muted">Senate Meeting</div><div class="text-sm mt-1">${formatDate(ticket.senate_meeting_date)}</div></div>` : ''}
+    ${ticket.vote_result ? `<div><div class="text-xs text-muted">Vote Result</div><div class="text-sm mt-1">${escHtml(ticket.vote_result)}</div></div>` : ''}
+  `;
+
+  // Sidebar details
+  document.getElementById('sidebar-details').innerHTML = `
+    <div style="display:grid;gap:12px;">
+      <div><div class="text-xs text-muted">Originator</div><div class="text-sm mt-1">${escHtml(ticket.originator_name||'—')}</div></div>
+      <div><div class="text-xs text-muted">Assignee</div><div class="text-sm mt-1">${escHtml(ticket.assignee_name||'Unassigned')}</div></div>
+      <div><div class="text-xs text-muted">Current Phase</div><div class="text-sm font-mono mt-1" style="color:var(--info);">${ticket.current_phase.replace(/_/g,' ')}</div></div>
+      <div><div class="text-xs text-muted">Created</div><div class="text-sm mt-1">${formatDate(ticket.created_at)}</div></div>
+      <div><div class="text-xs text-muted">Updated</div><div class="text-sm mt-1">${relativeTime(ticket.updated_at)}</div></div>
+    </div>
+  `;
+
+  // Phase timeline
+  const phases = ticket.type === 'university_amendment' ? TRACK_A : TRACK_B;
+  const currentIdx = phases.indexOf(ticket.current_phase);
+  const tlEl = document.getElementById('phase-timeline');
+  tlEl.innerHTML = phases.map((phase, i) => {
+    const histEntry = ticket.history?.find(h => h.phase === phase);
+    const isActive = i <= currentIdx;
+    const isCurrent = phase === ticket.current_phase;
+    return `
+      <div class="tl-item">
+        <div class="tl-dot ${isCurrent ? 'current' : isActive ? 'active' : ''}"></div>
+        <div class="tl-phase ${isActive ? 'active' : ''}">${phase.replace(/_/g,' ')}</div>
+        ${histEntry ? `<div class="tl-time">${formatDate(histEntry.entered_at)}${histEntry.entered_by_name ? ` · ${escHtml(histEntry.entered_by_name)}` : ''}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  // Phase actions (admin/chair/manager can advance)
+  const canAdvance = ['admin','bylaws_chair','senate_manager','ec_member','provost_office'].includes(user.role);
+  const phaseActionsEl = document.getElementById('phase-actions');
+  if (canAdvance && ticket.status !== 'published') {
+    phaseActionsEl.innerHTML = `
+      <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px;font-weight:600;">Actions</div>
+      <div style="display:grid;gap:8px;">
+        ${ticket.current_phase !== phases[phases.length-1] ? `<button class="btn btn-primary" id="advance-btn">Advance to Next Phase</button>` : ''}
+        <button class="btn ${ticket.status === 'stuck' ? 'btn-secondary' : 'btn-danger'}" id="stuck-btn">${ticket.status === 'stuck' ? 'Unmark Stuck' : 'Mark as Stuck'}</button>
+      </div>
+    `;
+    document.getElementById('advance-btn')?.addEventListener('click', advancePhase);
+    document.getElementById('stuck-btn').addEventListener('click', toggleStuck);
+  } else {
+    phaseActionsEl.classList.add('hidden');
+  }
+
+  // Attachments
+  renderAttachments(ticket.attachments || []);
+
+  // Comments
+  renderComments(ticket.comments || []);
+}
+
+function renderAttachments(attachments) {
+  const el = document.getElementById('attachments-list');
+  if (!attachments.length) { el.innerHTML = '<div class="text-muted text-sm">No attachments yet.</div>'; return; }
+  el.innerHTML = attachments.map(a => {
+    const icon = a.mime_type?.includes('pdf') ? '📄' : a.mime_type?.includes('word') ? '📝' : '📎';
+    return `
+      <div class="attach-item">
+        <div class="attach-icon">${icon}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(a.original_name)}</div>
+          <div class="text-xs text-muted">${(a.size/1024).toFixed(1)} KB · ${a.uploaded_by_name||''} · ${relativeTime(a.uploaded_at)}</div>
+        </div>
+        <a href="/BylawsTracker/api/tickets/${ticketId}/attachments/${a.id}/download" target="_blank" class="btn btn-secondary btn-sm">↓</a>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderComments(comments) {
+  const el = document.getElementById('comments-list');
+  if (!comments.length) { el.innerHTML = '<div class="text-muted text-sm" style="margin-bottom:12px;">No comments yet.</div>'; return; }
+  el.innerHTML = comments.map(c => `
+    <div class="comment">
+      <span class="comment-author">${escHtml(c.author_name)}</span>
+      <span class="role-tag" style="font-size:0.7rem;margin-left:6px;">${(c.author_role||'').replace(/_/g,' ')}</span>
+      <span class="comment-time">${relativeTime(c.created_at)}</span>
+      <div class="comment-body">${escHtml(c.body)}</div>
+    </div>
+  `).join('');
+}
+
+async function advancePhase() {
+  const btn = document.getElementById('advance-btn');
+  btn.disabled = true; btn.textContent = 'Advancing…';
+  try {
+    await apiFetch(`/tickets/${ticketId}/advance`, { method: 'POST' });
+    await load();
+  } catch (err) {
+    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    btn.disabled = false; btn.textContent = 'Advance to Next Phase';
+  }
+}
+
+async function toggleStuck() {
+  const btn = document.getElementById('stuck-btn');
+  btn.disabled = true;
+  try {
+    await apiFetch(`/tickets/${ticketId}/stuck`, { method: 'POST' });
+    await load();
+  } catch (err) {
+    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    btn.disabled = false;
+  }
+}
+
+// File upload
+document.getElementById('file-upload').addEventListener('change', async (e) => {
+  const files = e.target.files;
+  if (!files.length) return;
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+  try {
+    await fetch(`/BylawsTracker/api/tickets/${ticketId}/attachments`, {
+      method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd
+    });
+    await load();
+  } catch (err) {
+    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">Upload failed</div>`;
+  }
+  e.target.value = '';
+});
+
+// Comments
+document.getElementById('comment-submit').addEventListener('click', async () => {
+  const body = document.getElementById('comment-input').value.trim();
+  if (!body) return;
+  const btn = document.getElementById('comment-submit');
+  btn.disabled = true;
+  try {
+    await apiFetch(`/tickets/${ticketId}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
+    document.getElementById('comment-input').value = '';
+    await load();
+  } catch (err) {
+    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+  btn.disabled = false;
+});
+
+load();
+</script>
+</body>
+</html>

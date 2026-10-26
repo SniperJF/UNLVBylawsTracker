@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Request Access — UNLV Bylaws Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-box" style="max-width:500px;">
+    <div class="auth-logo">
+      <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="48" height="48" rx="10" fill="#cf0a2c"/>
+        <text x="24" y="32" font-family="serif" font-size="20" font-weight="bold" fill="white" text-anchor="middle">U</text>
+      </svg>
+    </div>
+    <div class="auth-title">Request Access</div>
+    <div class="auth-sub">Your account will be reviewed by an administrator before activation.</div>
+
+    <div id="alert-area"></div>
+
+    <form id="reg-form">
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" class="form-control" id="name" placeholder="Your Name" required>
+      </div>
+      <div class="form-group">
+        <label>UNLV Email</label>
+        <input type="email" class="form-control" id="email" placeholder="you@unlv.edu" required>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" class="form-control" id="password" placeholder="Min 8 characters" required minlength="8" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>Role Requested</label>
+        <select class="form-control" id="role_requested">
+          <option value="read_only">Read Only — view tracking only</option>
+          <option value="unit_submitter">Unit Submitter — submit unit bylaws</option>
+          <option value="ec_member">EC Member — Executive Committee</option>
+          <option value="bylaws_chair">Bylaws Chair — manage amendments</option>
+          <option value="senate_manager">Senate Manager — schedule &amp; agenda</option>
+          <option value="provost_office">Provost Office — review &amp; approval</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Reason for Access <span style="font-weight:400;text-transform:none;color:var(--muted)">(optional)</span></label>
+        <textarea class="form-control" id="reason" placeholder="Briefly explain your role..." style="min-height:80px;"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary w-full" id="submit-btn">Request Access</button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account? <a href="login.html">Sign in</a>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+if (getToken()) window.location.href = 'dashboard.html';
+
+document.getElementById('reg-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const alertArea = document.getElementById('alert-area');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  alertArea.innerHTML = '';
+
+  try {
+    await apiFetch('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        password: document.getElementById('password').value,
+        role_requested: document.getElementById('role_requested').value,
+        reason: document.getElementById('reason').value,
+      })
+    });
+    alertArea.innerHTML = '<div class="alert alert-success">Registration submitted! Check your email to verify, then wait for admin approval.</div>';
+    document.getElementById('reg-form').reset();
+  } catch (err) {
+    alertArea.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+  btn.disabled = false;
+  btn.textContent = 'Request Access';
+});
+</script>
+</body>
+</html>
