@@ -11,12 +11,12 @@ const router = express.Router();
 
 // Brute-force protection on login and forgot-password
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,  // 15 minutes
+  windowMs: 5 * 60 * 1000,
   max: 12,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many attempts — try again in 15 minutes' },
-  skipSuccessfulRequests: true,  // only count failures
+  message: { error: 'Too many attempts — try again in 5 minutes' },
+  skipSuccessfulRequests: true,
 });
 
 // POST /api/auth/register
