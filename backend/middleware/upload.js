@@ -3,7 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
-const uploadsDir = path.resolve(__dirname, process.env.UPLOADS_DIR || '../../uploads');
+// UPLOADS_DIR is interpreted relative to the backend/ directory, not this file
+const uploadsDir = path.resolve(__dirname, '..', process.env.UPLOADS_DIR || '../uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const storage = multer.diskStorage({
