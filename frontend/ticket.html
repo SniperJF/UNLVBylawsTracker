@@ -418,7 +418,7 @@ async function togglePreview(attachmentId, mimeType, originalName) {
       pane.appendChild(img);
 
     } else if (isDocx) {
-      await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
+      await _loadScript('js/mammoth.browser.min.js');
       const arrayBuffer = await blob.arrayBuffer();
       const result = await mammoth.convertToHtml({ arrayBuffer });
       _blobUrls[attachmentId] = 'rendered';
@@ -430,7 +430,7 @@ async function togglePreview(attachmentId, mimeType, originalName) {
       pane.appendChild(iframe);
 
     } else if (isXlsx) {
-      await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+      await _loadScript('js/xlsx.full.min.js');
       const arrayBuffer = await blob.arrayBuffer();
       const wb = XLSX.read(arrayBuffer, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
