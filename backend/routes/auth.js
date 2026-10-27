@@ -150,9 +150,15 @@ router.post('/change-password', requireAuth, async (req, res) => {
 // This keeps JWT off the URL (and out of nginx logs) for EventSource connections
 router.post('/sse-token', requireAuth, (req, res) => {
   const token = uuidv4();
-  const expiresAt = Date.now() + 60000; // 60 seconds — just enough to open the connection
+  const expiresAt = Date.now() + 60000;
   db.prepare('INSERT INTO sse_tokens (token, user_id, expires_at) VALUES (?, ?, ?)').run(token, req.user.id, expiresAt);
   res.json({ token, expires_in: 60 });
+});
+
+// POST /api/auth/logout — purge this user's SSE tokens immediately
+router.post('/logout', requireAuth, (req, res) => {
+  db.prepare('DELETE FROM sse_tokens WHERE user_id = ?').run(req.user.id);
+  res.json({ message: 'Logged out' });
 });
 
 module.exports = router;

@@ -38,6 +38,13 @@ function setAuth(token, user) {
 }
 
 function clearAuth() {
+  const token = getToken();
+  if (token) {
+    fetch(API + '/auth/logout', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).catch(() => {});
+  }
   localStorage.removeItem('bylaws_token');
   localStorage.removeItem('bylaws_user');
 }
