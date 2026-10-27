@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" href="img/logo.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Verify Email — UNLV Bylaws Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -43,8 +44,8 @@ if (!token) {
   fetch('/BylawsTracker/api/auth/verify?token=' + encodeURIComponent(token))
     .then(r => r.json())
     .then(d => {
-      if (d.message) el.innerHTML = `<div class="alert alert-success">${d.message}</div><a href="login.html" class="btn btn-primary mt-3" style="margin-top:12px;">Go to Login</a>`;
-      else el.innerHTML = `<div class="alert alert-error">${d.error || 'Verification failed.'}</div>`;
+      if (d.message) el.innerHTML = `<div class="alert alert-success">${escHtml(d.message)}</div><a href="login.html" class="btn btn-primary mt-3" style="margin-top:12px;">Go to Login</a>`;
+      else el.innerHTML = `<div class="alert alert-error">${escHtml(d.error) || 'Verification failed.'}</div>`;
     }).catch(() => { el.innerHTML = '<div class="alert alert-error">Network error.</div>'; });
 }
 </script>

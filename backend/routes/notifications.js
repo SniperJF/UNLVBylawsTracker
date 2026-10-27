@@ -19,17 +19,28 @@ function sendToUser(userId, data) {
 
 router.sendToUser = sendToUser;
 
-// GET /api/notifications/stream — SSE (auth via Bearer header OR ?token= query)
+// GET /api/notifications/stream — SSE (auth via short-lived SSE token OR Bearer JWT)
 router.get('/stream', (req, res) => {
-  // Resolve token from query string when EventSource can't set headers
   const token = (req.headers.authorization || '').replace('Bearer ', '') || req.query.token;
   if (!token) return res.status(401).end();
 
-  let payload;
-  try { payload = jwt.verify(token, process.env.JWT_SECRET); }
-  catch { return res.status(401).end(); }
+  let userId;
 
-  const user = db.prepare('SELECT id, email, name, role, approved FROM users WHERE id = ?').get(payload.id);
+  // Prefer one-time SSE token (UUID from /auth/sse-token)
+  const sseRow = db.prepare('SELECT user_id, expires_at FROM sse_tokens WHERE token = ?').get(token);
+  if (sseRow) {
+    if (Date.now() > sseRow.expires_at) return res.status(401).end();
+    db.prepare('DELETE FROM sse_tokens WHERE token = ?').run(token);
+    userId = sseRow.user_id;
+  } else {
+    // Fall back to direct JWT (Bearer header path)
+    let payload;
+    try { payload = jwt.verify(token, process.env.JWT_SECRET); }
+    catch { return res.status(401).end(); }
+    userId = payload.id;
+  }
+
+  const user = db.prepare('SELECT id, email, name, role, approved FROM users WHERE id = ?').get(userId);
   if (!user || !user.approved) return res.status(401).end();
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -38,7 +49,6 @@ router.get('/stream', (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
 
-  const userId = user.id;
   if (!clients.has(userId)) clients.set(userId, new Set());
   clients.get(userId).add(res);
 

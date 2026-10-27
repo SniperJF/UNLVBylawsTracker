@@ -252,8 +252,12 @@ tr:hover td { background: var(--panel); }
 /* Kanban */
 .kanban-board {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px; align-items: start;
+}
+/* Full-width kanban — removes the 1280px cap so all 9 phases can spread out */
+.page-wrap.kanban-wide {
+  max-width: none;
 }
 .kanban-col {
   background: var(--panel); border: 1px solid var(--border);

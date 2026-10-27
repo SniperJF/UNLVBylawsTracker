@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" href="img/logo.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin — UNLV Bylaws Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,7 +21,7 @@
 
 <nav class="topnav">
   <div class="topnav-inner">
-    <a href="dashboard.html" class="nav-brand">
+    <a href="/BylawsTracker/" class="nav-brand">
       <img src="img/logo.png" alt="" style="width:30px;height:30px;border-radius:7px;object-fit:cover;">
       Bylaws Tracker<span class="dot">.</span>
     </a>
@@ -117,7 +118,6 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 const ROLES = ['admin','bylaws_chair','senate_manager','ec_member','provost_office','unit_submitter','read_only'];
 
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 async function loadRequests() {
   try {
@@ -135,7 +135,7 @@ async function loadRequests() {
           <div>
             <div style="font-weight:600;">${escHtml(r.name)}</div>
             <div class="text-sm text-muted">${escHtml(r.email)}</div>
-            <div class="text-xs text-muted mt-1">Requested: <strong>${r.role_requested.replace(/_/g,' ')}</strong>${r.reason ? ` · "${escHtml(r.reason)}"` : ''}</div>
+            <div class="text-xs text-muted mt-1">Requested: <strong>${escHtml(r.role_requested).replace(/_/g,' ')}</strong>${r.reason ? ` · "${escHtml(r.reason)}"` : ''}</div>
             <div class="text-xs" style="margin-top:4px;">
               Email: ${r.email_verified ? '✓ verified' : '✗ not verified'}
             </div>
@@ -151,7 +151,7 @@ async function loadRequests() {
       </div>
     `).join('');
   } catch (err) {
-    document.getElementById('requests-list').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    document.getElementById('requests-list').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
   }
 }
 
@@ -189,13 +189,16 @@ async function loadUsers() {
         <td>
           <div class="flex gap-2">
             ${!u.approved ? `<button class="btn btn-primary btn-sm" onclick="approveUserDirect(${u.id})">Approve</button>` : ''}
-            <button class="btn btn-secondary btn-sm" onclick="openReset(${u.id}, '${escHtml(u.name)}')">Reset PW</button>
+            <button class="btn btn-secondary btn-sm reset-pw-btn" data-uid="${u.id}" data-uname="${escHtml(u.name)}">Reset PW</button>
           </div>
         </td>
       </tr>
     `).join('');
+    document.querySelectorAll('.reset-pw-btn').forEach(btn => {
+      btn.addEventListener('click', () => openReset(+btn.dataset.uid, btn.dataset.uname));
+    });
   } catch (err) {
-    document.getElementById('users-body').innerHTML = `<tr><td colspan="5"><div class="alert alert-error">${err.message}</div></td></tr>`;
+    document.getElementById('users-body').innerHTML = `<tr><td colspan="5"><div class="alert alert-error">${escHtml(err.message)}</div></td></tr>`;
   }
 }
 
@@ -232,11 +235,11 @@ document.getElementById('reset-confirm').addEventListener('click', async () => {
     await apiFetch(`/users/${resetUserId}/reset-password`, { method: 'POST', body: JSON.stringify({ new_password: pw }) });
     document.getElementById('reset-modal').style.display = 'none';
     showAlert('Password reset.', 'success');
-  } catch (err) { document.getElementById('reset-alert').innerHTML = `<div class="alert alert-error">${err.message}</div>`; }
+  } catch (err) { document.getElementById('reset-alert').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`; }
 });
 
 function showAlert(msg, type) {
-  document.getElementById('alert-area').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  document.getElementById('alert-area').innerHTML = `<div class="alert alert-${'success'===type?'success':'error'}">${escHtml(msg)}</div>`;
   setTimeout(() => { document.getElementById('alert-area').innerHTML = ''; }, 4000);
 }
 

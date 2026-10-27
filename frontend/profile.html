@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" href="img/logo.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Profile — UNLV Bylaws Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,7 +14,7 @@
 
 <nav class="topnav">
   <div class="topnav-inner">
-    <a href="dashboard.html" class="nav-brand">
+    <a href="/BylawsTracker/" class="nav-brand">
       <img src="img/logo.png" alt="" style="width:30px;height:30px;border-radius:7px;object-fit:cover;">
       Bylaws Tracker<span class="dot">.</span>
     </a>
@@ -84,9 +85,9 @@ document.getElementById('logout-btn').addEventListener('click', () => { clearAut
 const user = getUser();
 document.getElementById('profile-info').innerHTML = `
   <div style="display:grid;gap:12px;">
-    <div><div class="text-xs text-muted">Name</div><div class="mt-1">${user?.name || ''}</div></div>
-    <div><div class="text-xs text-muted">Email</div><div class="mt-1">${user?.email || ''}</div></div>
-    <div><div class="text-xs text-muted">Role</div><div class="mt-1"><span class="role-tag">${(user?.role||'').replace(/_/g,' ')}</span></div></div>
+    <div><div class="text-xs text-muted">Name</div><div class="mt-1">${escHtml(user?.name)}</div></div>
+    <div><div class="text-xs text-muted">Email</div><div class="mt-1">${escHtml(user?.email)}</div></div>
+    <div><div class="text-xs text-muted">Role</div><div class="mt-1"><span class="role-tag">${escHtml((user?.role||'').replace(/_/g,' '))}</span></div></div>
   </div>
 `;
 
@@ -109,7 +110,7 @@ document.getElementById('pw-form').addEventListener('submit', async (e) => {
     setTimeout(() => { clearAuth(); window.location.href = 'login.html'; }, 2200);
     return;
   } catch (err) {
-    alertEl.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    alertEl.innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
   }
   btn.disabled = false; btn.textContent = 'Update Password';
 });

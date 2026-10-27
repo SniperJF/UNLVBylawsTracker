@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" href="img/logo.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Notifications — UNLV Bylaws Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,7 +14,7 @@
 
 <nav class="topnav">
   <div class="topnav-inner">
-    <a href="dashboard.html" class="nav-brand">
+    <a href="/BylawsTracker/" class="nav-brand">
       <img src="img/logo.png" alt="" style="width:30px;height:30px;border-radius:7px;object-fit:cover;">
       Bylaws Tracker<span class="dot">.</span>
     </a>
@@ -96,9 +97,12 @@ async function loadNotifications() {
           </div>
           <div class="notif-time">${relativeTime(n.created_at)}</div>
         </div>
-        ${!n.read ? `<button class="btn btn-secondary btn-sm" onclick="markRead(${n.id}, this)">Read</button>` : ''}
+        ${!n.read ? `<button class="btn btn-secondary btn-sm mark-read-btn" data-nid="${n.id}">Read</button>` : ''}
       </div>
     `).join('');
+    el.querySelectorAll('.mark-read-btn').forEach(btn => {
+      btn.addEventListener('click', () => markRead(+btn.dataset.nid, btn));
+    });
   } catch (err) {
     document.getElementById('notif-container').innerHTML = `<div class="alert alert-error m-4">${err.message}</div>`;
   }
@@ -126,7 +130,6 @@ document.getElementById('clear-all').addEventListener('click', async () => {
   updateBadge(0);
 });
 
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 loadNotifications();
 </script>

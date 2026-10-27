@@ -13,8 +13,9 @@ const MOVER_ROLES = ['admin','bylaws_chair','senate_manager','ec_member','provos
 // Roles that can create tickets
 const CREATOR_ROLES = ['admin','bylaws_chair','senate_manager','ec_member','unit_submitter'];
 
+const VALID_TYPES = { university_amendment: TRACK_A_PHASES, unit_bylaws: TRACK_B_PHASES };
 function phasesFor(type) {
-  return type === 'university_amendment' ? TRACK_A_PHASES : TRACK_B_PHASES;
+  return VALID_TYPES[type] || null;
 }
 
 function createNotification(userId, type, message, ticketId) {

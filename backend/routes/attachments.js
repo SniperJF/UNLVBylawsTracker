@@ -69,6 +69,9 @@ router.delete('/:id', (req, res) => {
     return res.status(403).json({ error: 'Cannot delete this attachment' });
   }
 
+  if (!/^[0-9a-f-]{36}\.[a-z]{2,5}$/.test(attachment.filename)) {
+    return res.status(500).json({ error: 'Invalid stored filename' });
+  }
   const filePath = path.join(uploadsDir, attachment.filename);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   db.prepare('DELETE FROM ticket_attachments WHERE id = ?').run(req.params.id);

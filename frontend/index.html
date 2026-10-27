@@ -2,14 +2,739 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="img/logo.png" type="image/png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>UNLV Bylaws Tracker</title>
+<meta name="description" content="Track faculty senate bylaws amendments through the full governance lifecycle — committee vote to chancellor signature.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script>
-// Redirect to dashboard if logged in, otherwise login
-var token = localStorage.getItem('bylaws_token');
-if (token) window.location.replace('dashboard.html');
-else window.location.replace('login.html');
+// Blocking theme init — runs before body paint to eliminate flash
+(function(){
+  var stored = localStorage.getItem('bylaws_theme');
+  var dark = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+})();
 </script>
+<style>
+/*
+  Layout : centered hero → horizontal-scroll flow diagram (2 tracks) → feature strip → footer
+  Type   : Libre Baskerville (legal gravity, display only) × Space Grotesk (UI) × JetBrains Mono (labels/data)
+  Palette: warm parchment/near-black, UNLV scarlet #cf0a2c, willow-green for published
+*/
+:root {
+  --scarlet:    #cf0a2c;
+  --scarlet-lo: rgba(207,10,44,0.10);
+  --scarlet-md: rgba(207,10,44,0.28);
+  --green:      #16a34a;
+  --green-lo:   rgba(22,163,74,0.10);
+  --bg:         #eeeae3;
+  --surface:    #f8f6f2;
+  --surface2:   #e2ddd5;
+  --border:     rgba(28,22,38,0.11);
+  --text:       #1c1828;
+  --sub:        #6e6680;
+  --figure:     #2a2436;
+  --arrow:      #cf0a2c;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:        #0b0c12;
+    --surface:   #111319;
+    --surface2:  #191c26;
+    --border:    rgba(210,205,235,0.10);
+    --text:      #dad6f0;
+    --sub:       #8f8ba6;
+    --figure:    #dad6f0;
+    --arrow:     #e82040;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:        #0b0c12;
+  --surface:   #111319;
+  --surface2:  #191c26;
+  --border:    rgba(210,205,235,0.10);
+  --text:      #dad6f0;
+  --sub:       #8f8ba6;
+  --figure:    #dad6f0;
+  --arrow:     #e82040;
+  color-scheme: dark;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Space Grotesk',system-ui,sans-serif;
+  line-height:1.6;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* ── Wrapper ─────────────────────────────────────────────── */
+.wrap{
+  max-width:1280px;
+  margin:0 auto;
+  width:100%;
+  padding-left:max(24px,env(safe-area-inset-left,0px));
+  padding-right:max(24px,env(safe-area-inset-right,0px));
+}
+
+/* ── Nav ─────────────────────────────────────────────────── */
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:18px 0;
+  border-bottom:1px solid var(--border);
+}
+.brand{
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:700;
+  font-size:.95rem;
+  color:var(--text);
+  text-decoration:none;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  letter-spacing:-.01em;
+}
+.brand-logo{
+  width:28px;height:28px;
+  background:var(--scarlet);
+  border-radius:7px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.brand-dot{color:var(--scarlet)}
+.nav-links{display:flex;gap:8px;align-items:center}
+.nav-links a{
+  font-size:.85rem;color:var(--sub);
+  text-decoration:none;padding:7px 14px;border-radius:7px;
+  transition:color .15s,background .15s;
+}
+.nav-links a:hover{color:var(--text);background:var(--surface)}
+.btn-login{
+  background:var(--scarlet);color:#fff !important;
+  font-weight:700;font-size:.84rem;
+  padding:8px 20px;border-radius:7px;
+  transition:opacity .15s,transform .15s;
+}
+.btn-login:hover{opacity:.87;transform:translateY(-1px)}
+
+/* ── Hero ────────────────────────────────────────────────── */
+.hero{padding:80px 0 64px;text-align:center}
+.hero-eyebrow{
+  font-family:'JetBrains Mono',monospace;
+  font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--scarlet);margin-bottom:18px;
+}
+.hero-h1{
+  font-family:'Libre Baskerville',Georgia,serif;
+  font-size:clamp(2.2rem,5.5vw,4rem);
+  font-weight:700;line-height:1.1;
+  text-wrap:balance;margin-bottom:22px;
+}
+.hero-h1 em{font-style:italic;color:var(--scarlet)}
+.hero-sub{
+  font-size:1.05rem;color:var(--sub);
+  max-width:480px;margin:0 auto 36px;
+  text-wrap:balance;line-height:1.75;
+}
+.hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn-primary{
+  background:var(--scarlet);color:#fff;
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:700;font-size:.9rem;
+  padding:14px 34px;border-radius:8px;
+  text-decoration:none;letter-spacing:.01em;
+  transition:opacity .15s,transform .15s;display:inline-block;
+}
+.btn-primary:hover{opacity:.87;transform:translateY(-1px)}
+.btn-ghost{
+  background:transparent;color:var(--text);
+  font-size:.9rem;padding:13px 26px;
+  border-radius:8px;border:1px solid var(--border);
+  text-decoration:none;transition:background .15s,border-color .15s;
+  display:inline-block;
+}
+.btn-ghost:hover{background:var(--surface);border-color:var(--sub)}
+
+/* ── Section heads ───────────────────────────────────────── */
+.sec-eyebrow{
+  font-family:'JetBrains Mono',monospace;
+  font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--scarlet);text-align:center;margin-bottom:6px;
+}
+.sec-h2{
+  font-family:'Libre Baskerville',Georgia,serif;
+  font-size:clamp(1.4rem,3vw,2rem);font-weight:700;
+  text-align:center;text-wrap:balance;margin-bottom:8px;
+}
+.sec-desc{
+  text-align:center;color:var(--sub);font-size:.95rem;
+  max-width:520px;margin:0 auto 48px;line-height:1.7;
+}
+
+/* ── Process ─────────────────────────────────────────────── */
+.process{padding:0 0 72px}
+.track-label{
+  font-family:'JetBrains Mono',monospace;
+  font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--sub);margin-bottom:18px;display:flex;align-items:center;gap:8px;
+}
+.track-label::after{
+  content:'';flex:1;height:1px;background:var(--border);
+}
+
+/* ── Flow scroll ─────────────────────────────────────────── */
+.flow-scroll{
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  padding-bottom:10px;margin-bottom:0;
+}
+.flow-scroll::-webkit-scrollbar{height:3px}
+.flow-scroll::-webkit-scrollbar-track{background:transparent}
+.flow-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.flow-row{
+  display:flex;align-items:flex-end;
+  min-width:max-content;padding-bottom:6px;
+}
+
+/* ── Phase node ──────────────────────────────────────────── */
+.pnode{
+  display:flex;flex-direction:column;align-items:center;
+  width:108px;flex-shrink:0;position:relative;padding-top:12px;
+}
+.step-num{
+  position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:22px;height:22px;border-radius:50%;
+  background:var(--scarlet);color:#fff;
+  font-family:'JetBrains Mono',monospace;font-size:.62rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  z-index:3;box-shadow:0 0 0 2px var(--bg);
+}
+.pcard{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:14px 8px 12px;width:100%;
+  display:flex;flex-direction:column;align-items:center;gap:9px;
+  transition:border-color .2s,box-shadow .2s;
+}
+.pcard:hover{
+  border-color:var(--scarlet);
+  box-shadow:0 0 0 1px var(--scarlet),0 6px 24px var(--scarlet-md);
+}
+.pcard.done{
+  border-color:rgba(22,163,74,.4);
+  background:var(--green-lo);
+}
+.pcard.done:hover{
+  border-color:var(--green);
+  box-shadow:0 0 0 1px var(--green),0 6px 20px rgba(22,163,74,.2);
+}
+.pfig{width:54px;height:48px;position:relative;flex-shrink:0}
+.pfig svg{width:100%;height:100%;overflow:visible}
+.plabel{
+  font-family:'JetBrains Mono',monospace;
+  font-size:.56rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--scarlet);font-weight:700;text-align:center;line-height:1.4;
+}
+.pcard.done .plabel{color:var(--green)}
+.pdesc{font-size:.66rem;color:var(--sub);text-align:center;line-height:1.45}
+.deadline-pill{
+  font-family:'JetBrains Mono',monospace;font-size:.56rem;font-weight:700;
+  color:var(--scarlet);background:var(--scarlet-lo);
+  border-radius:4px;padding:2px 6px;margin-top:1px;
+}
+
+/* ── Arrow ───────────────────────────────────────────────── */
+.arw{
+  width:32px;flex-shrink:0;align-self:center;
+  margin-bottom:22px;
+}
+.arw svg{display:block;overflow:visible}
+.aline{
+  stroke:var(--arrow);stroke-width:2;fill:none;
+  stroke-dasharray:5 3.5;
+  animation:dashFlow .9s linear infinite;
+}
+@keyframes dashFlow{from{stroke-dashoffset:17}to{stroke-dashoffset:0}}
+.ahead{fill:var(--arrow)}
+
+/* ── Figure animations ───────────────────────────────────── */
+@keyframes floatUp{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-5px)}
+}
+.ff{
+  transform-box:fill-box;
+  transform-origin:center bottom;
+  animation:floatUp 2.6s ease-in-out infinite;
+}
+.ff.d0{animation-delay:0s}
+.ff.d1{animation-delay:.55s}
+.ff.d2{animation-delay:1.1s}
+.ff.d3{animation-delay:1.65s}
+.ff.d4{animation-delay:.3s}
+
+@keyframes checkPop{
+  0%,85%,100%{transform:scale(1)}
+  92%{transform:scale(1.18)}
+}
+.done .pfig{animation:checkPop 3s ease-in-out infinite}
+
+@media(prefers-reduced-motion:reduce){
+  .aline{animation:none;stroke-dasharray:none}
+  .ff,.done .pfig{animation:none}
+}
+
+/* ── SVG token classes (CSS vars don't resolve in SVG presentation attrs) */
+.sv-fs  { fill:   var(--scarlet)  }
+.sv-ss  { stroke: var(--scarlet)  }
+.sv-fsu { fill:   var(--surface)  }
+.sv-fsu2{ fill:   var(--surface2) }
+.sv-sub { stroke: var(--sub)      }
+.sv-fig { fill:   var(--figure)   }
+.sv-arr { fill:   var(--arrow)    }
+
+/* ── Theme toggle ────────────────────────────────────────── */
+.theme-btn{
+  background:none;border:1px solid var(--border);
+  color:var(--sub);width:34px;height:34px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:border-color .15s,color .15s;flex-shrink:0;
+}
+.theme-btn:hover{border-color:var(--text);color:var(--text)}
+
+/* ── Feature strip ───────────────────────────────────────── */
+.features{
+  border-top:1px solid var(--border);
+  padding:60px 0 72px;
+}
+.feat-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:20px;margin-top:0;
+}
+.feat-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:22px;
+}
+.feat-icon{
+  width:36px;height:36px;border-radius:9px;
+  background:var(--scarlet-lo);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:14px;color:var(--scarlet);
+}
+.feat-icon.green-ic{background:var(--green-lo);color:var(--green)}
+.feat-card h3{
+  font-family:'Libre Baskerville',Georgia,serif;
+  font-size:.95rem;font-weight:700;margin-bottom:7px;
+}
+.feat-card p{font-size:.8rem;color:var(--sub);line-height:1.6}
+
+/* ── Footer ──────────────────────────────────────────────── */
+.site-footer{
+  margin-top:auto;border-top:1px solid var(--border);
+  padding:18px 0;text-align:center;
+  font-size:.78rem;color:var(--sub);
+}
+.site-footer strong{color:var(--text)}
+</style>
 </head>
-<body></body>
+<body>
+
+<div class="wrap">
+
+<!-- Nav -->
+<nav class="topbar">
+  <a href="/BylawsTracker/" class="brand">
+    <div class="brand-logo">
+      <svg width="16" height="14" viewBox="0 0 16 14" fill="none">
+        <path d="M2 2h12M2 7h9M2 12h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    Bylaws Tracker<span class="brand-dot">.</span>
+  </a>
+  <div class="nav-links">
+    <a href="#process">How it works</a>
+    <button class="theme-btn" id="theme-btn" title="Toggle theme" aria-label="Toggle dark/light mode">
+      <svg id="theme-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"></svg>
+    </button>
+    <a href="login.html" class="btn-login">Log in →</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-eyebrow">UNLV Faculty Senate · Academic Year 2026–27</div>
+  <h1 class="hero-h1">Every amendment,<br><em>tracked to signature.</em></h1>
+  <p class="hero-sub">A governance ticketing system for UNLV faculty senate bylaws amendments — from committee vote through chancellor approval.</p>
+  <div class="hero-cta">
+    <a href="login.html" class="btn-primary">Open the Tracker</a>
+    <a href="#process" class="btn-ghost">See the process</a>
+  </div>
+</section>
+
+<!-- Process -->
+<section class="process" id="process">
+  <p class="sec-eyebrow">Governance Lifecycle</p>
+  <h2 class="sec-h2">The amendment pipeline</h2>
+  <p class="sec-desc">University bylaws amendments follow a structured approval chain. Every ticket maps exactly to one of two tracks.</p>
+
+  <div style="margin-bottom:48px">
+    <div class="track-label">Track A — University Bylaws Amendments</div>
+    <div class="flow-scroll">
+      <div class="flow-row" id="rowA"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="track-label">Track B — Unit Bylaws</div>
+    <div class="flow-scroll">
+      <div class="flow-row" id="rowB"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features">
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5M16 4v5"/>
+        </svg>
+      </div>
+      <h3>Live phase tracking</h3>
+      <p>Every amendment shows its exact phase, who moved it, and how long it has been waiting at each step.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="9"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </div>
+      <h3>Deadline countdowns</h3>
+      <p>Presidential and Chancellor reviews have mandated timelines. Color-coded badges flag anything at risk of running over.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+        </svg>
+      </div>
+      <h3>Documents attached</h3>
+      <p>Draft language, approval forms, yellow sheets, and signed PDFs live with each ticket — no hunting through email threads.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon green-ic">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <h3>Stuck flag</h3>
+      <p>When an amendment stalls — political or procedural — it gets flagged so it never quietly falls through the cracks.</p>
+    </div>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<footer class="site-footer">
+  <div class="wrap">
+    Built by <strong>FRG</strong> &nbsp;·&nbsp; UNLV Faculty Senate Bylaws Tracker
+  </div>
+</footer>
+
+<script>
+// ── Theme toggle ───────────────────────────────────────────────────────────
+(function() {
+  const LS_KEY = 'bylaws_theme';
+  const root   = document.documentElement;
+  const icon   = document.getElementById('theme-icon');
+
+  function isDark() {
+    const stored = localStorage.getItem(LS_KEY);
+    if (stored) return stored === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  function applyTheme(dark) {
+    root.setAttribute('data-theme', dark ? 'dark' : 'light');
+    if (icon) icon.innerHTML = dark
+      ? '<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>'
+      : '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  }
+
+  // Apply icon only (data-theme already set by head script)
+  applyTheme(isDark());
+
+  document.getElementById('theme-btn').addEventListener('click', () => {
+    const dark = root.getAttribute('data-theme') !== 'dark';
+    localStorage.setItem(LS_KEY, dark ? 'dark' : 'light');
+    applyTheme(dark);
+  });
+
+  // Follow OS changes when no manual preference stored
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+    if (!localStorage.getItem(LS_KEY)) applyTheme(e.matches);
+  });
+})();
+
+// ── SVG silhouettes ────────────────────────────────────────────────────────
+// Each returns an SVG string; color tokens applied via CSS currentColor
+const S = {
+  // 3-person group, two with raised hands (committee vote)
+  committee:`<svg viewBox="0 0 76 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g class="ff d0" style="color:var(--figure)">
+      <circle cx="11" cy="9" r="5.5" fill="currentColor"/>
+      <path d="M5 20c0-4 12-4 12 0l-1 11H6Z" fill="currentColor"/>
+      <line x1="5" y1="22" x2="0" y2="13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="17" y1="22" x2="21" y2="28" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="7" y1="31" x2="4" y2="42" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="15" y1="31" x2="18" y2="42" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+    </g>
+    <g class="ff d1" style="color:var(--figure)">
+      <circle cx="38" cy="8" r="6.5" fill="currentColor"/>
+      <path d="M31 19c0-4 14-4 14 0l-2 12H33Z" fill="currentColor"/>
+      <line x1="31" y1="21" x2="25" y2="28" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="45" y1="21" x2="51" y2="28" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="34" y1="31" x2="31" y2="42" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="42" y1="31" x2="45" y2="42" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+    </g>
+    <g class="ff d2" style="color:var(--figure)">
+      <circle cx="65" cy="9" r="5.5" fill="currentColor"/>
+      <path d="M59 20c0-4 12-4 12 0l-1 11H60Z" fill="currentColor"/>
+      <line x1="59" y1="22" x2="55" y2="28" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="71" y1="22" x2="76" y2="13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="61" y1="31" x2="58" y2="42" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="69" y1="31" x2="72" y2="42" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+    </g>
+    <text x="0" y="12" font-size="7" class="sv-fs" font-family="sans-serif">✓</text>
+    <text x="71" y="12" font-size="7" class="sv-fs" font-family="sans-serif">✓</text>
+  </svg>`,
+
+  // 2 people reviewing a document
+  ec:`<svg viewBox="0 0 60 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g class="ff d0" style="color:var(--figure)">
+      <circle cx="14" cy="9" r="6" fill="currentColor"/>
+      <path d="M8 21c0-4 12-4 12 0l-1 11H9Z" fill="currentColor"/>
+      <line x1="8" y1="23" x2="3" y2="30" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="20" y1="23" x2="25" y2="29" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="10" y1="32" x2="7" y2="43" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="18" y1="32" x2="21" y2="43" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+    </g>
+    <g class="ff d2" style="color:var(--figure)">
+      <circle cx="46" cy="9" r="6" fill="currentColor"/>
+      <path d="M40 21c0-4 12-4 12 0l-1 11H41Z" fill="currentColor"/>
+      <line x1="40" y1="23" x2="35" y2="29" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="52" y1="23" x2="57" y2="30" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="42" y1="32" x2="39" y2="43" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="50" y1="32" x2="53" y2="43" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+    </g>
+    <rect x="22" y="27" width="16" height="11" rx="2" class="sv-fs" opacity=".75"/>
+    <line x1="25" y1="31" x2="35" y2="31" stroke="#fff" stroke-width="1.1"/>
+    <line x1="25" y1="34" x2="33" y2="34" stroke="#fff" stroke-width="1.1"/>
+  </svg>`,
+
+  // person at podium with paper
+  agenda:`<svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g class="ff d0" style="color:var(--figure)">
+      <circle cx="26" cy="9" r="7" fill="currentColor"/>
+      <path d="M19 22c0-4 14-4 14 0l-2 12H21Z" fill="currentColor"/>
+      <line x1="19" y1="24" x2="13" y2="31" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+      <line x1="33" y1="24" x2="39" y2="31" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+    </g>
+    <path d="M12 37h28l-2 14H14Z" class="sv-fig" opacity=".12"/>
+    <rect x="12" y="34" width="28" height="5" rx="2.5" class="sv-fig" opacity=".22"/>
+    <rect x="17" y="26" width="18" height="13" rx="2.5" class="sv-fsu"/>
+    <line x1="20" y1="30" x2="32" y2="30" class="sv-ss" stroke-width="1.3"/>
+    <line x1="20" y1="33" x2="30" y2="33" class="sv-ss" stroke-width="1.3"/>
+    <line x1="20" y1="36" x2="31" y2="36" class="sv-ss" stroke-width="1.3"/>
+  </svg>`,
+
+  // 5 people with one hand raised (floor vote)
+  senate:`<svg viewBox="0 0 88 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g class="ff d0" style="color:var(--figure)">
+      <circle cx="9" cy="9" r="5" fill="currentColor"/>
+      <path d="M4 19c0-3.5 10-3.5 10 0l-1 10H5Z" fill="currentColor"/>
+      <line x1="4" y1="21" x2="0" y2="27" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="14" y1="21" x2="18" y2="27" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="6" y1="29" x2="3" y2="39" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="12" y1="29" x2="15" y2="39" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <g class="ff d1" style="color:var(--figure)">
+      <circle cx="27" cy="9" r="5" fill="currentColor"/>
+      <path d="M22 19c0-3.5 10-3.5 10 0l-1 10H23Z" fill="currentColor"/>
+      <line x1="22" y1="21" x2="17" y2="27" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="32" y1="21" x2="36" y2="27" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="24" y1="29" x2="21" y2="39" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="30" y1="29" x2="33" y2="39" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <g class="ff d2" style="color:var(--figure)">
+      <circle cx="44" cy="8" r="6" fill="currentColor"/>
+      <path d="M38 19c0-4 12-4 12 0l-1 11H39Z" fill="currentColor"/>
+      <line x1="38" y1="21" x2="32" y2="27" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="50" y1="21" x2="50" y2="11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+      <line x1="40" y1="30" x2="37" y2="40" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="48" y1="30" x2="51" y2="40" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <g class="ff d3" style="color:var(--figure)">
+      <circle cx="61" cy="9" r="5" fill="currentColor"/>
+      <path d="M56 19c0-3.5 10-3.5 10 0l-1 10H57Z" fill="currentColor"/>
+      <line x1="56" y1="21" x2="51" y2="27" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="66" y1="21" x2="70" y2="27" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="58" y1="29" x2="55" y2="39" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="64" y1="29" x2="67" y2="39" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <g class="ff d4" style="color:var(--figure)">
+      <circle cx="79" cy="9" r="5" fill="currentColor"/>
+      <path d="M74 19c0-3.5 10-3.5 10 0l-1 10H75Z" fill="currentColor"/>
+      <line x1="74" y1="21" x2="69" y2="27" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="84" y1="21" x2="88" y2="27" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="76" y1="29" x2="73" y2="39" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="82" y1="29" x2="85" y2="39" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </g>
+  </svg>`,
+
+  // person with scales of justice
+  counsel:`<svg viewBox="0 0 56 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g class="ff d0" style="color:var(--figure)">
+      <circle cx="20" cy="9" r="7" fill="currentColor"/>
+      <path d="M13 21c0-4 14-4 14 0l-2 12H15Z" fill="currentColor"/>
+      <line x1="13" y1="23" x2="8" y2="30" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+      <line x1="27" y1="23" x2="34" y2="19" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+      <line x1="15" y1="33" x2="12" y2="44" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+      <line x1="23" y1="33" x2="26" y2="44" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+    </g>
+    <line x1="42" y1="13" x2="42" y2="40" class="sv-ss" stroke-width="1.4"/>
+    <line x1="33" y1="19" x2="51" y2="19" class="sv-ss" stroke-width="1.4"/>
+    <path d="M30 19 Q30 27 36 27 Q42 27 42 19" class="sv-ss" stroke-width="1.3" fill="none"/>
+    <path d="M42 19 Q42 25 48 25 Q54 25 54 19" class="sv-ss" stroke-width="1.3" fill="none"/>
+    <line x1="39" y1="40" x2="45" y2="40" class="sv-ss" stroke-width="2" stroke-linecap="round"/>
+  </svg>`,
+
+  // person with mortarboard
+  provost:`<svg viewBox="0 0 46 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g class="ff d0" style="color:var(--figure)">
+      <polygon points="10,11 23,5 36,11 23,17" fill="currentColor"/>
+      <rect x="19" y="11" width="8" height="3.5" fill="currentColor"/>
+      <line x1="36" y1="11" x2="41" y2="20" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      <circle cx="23" cy="17" r="6" fill="currentColor"/>
+      <path d="M16 29c0-4 14-4 14 0l-2 13H18Z" fill="currentColor"/>
+      <line x1="16" y1="31" x2="9" y2="38" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+      <line x1="30" y1="31" x2="37" y2="38" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+      <line x1="19" y1="42" x2="16" y2="52" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+      <line x1="27" y1="42" x2="30" y2="52" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+    </g>
+  </svg>`,
+
+  // formal single figure (president)
+  president:`<svg viewBox="0 0 46 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g class="ff d0" style="color:var(--figure)">
+      <circle cx="23" cy="9" r="8" fill="currentColor"/>
+      <path d="M13 23c0-5 20-5 20 0l-2 15H15Z" fill="currentColor"/>
+      <path d="M21 23l2 8 2-8" class="sv-fsu" opacity=".35"/>
+      <line x1="13" y1="26" x2="5" y2="34" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>
+      <line x1="33" y1="26" x2="41" y2="34" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>
+      <line x1="16" y1="38" x2="12" y2="50" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>
+      <line x1="30" y1="38" x2="34" y2="50" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>
+    </g>
+  </svg>`,
+
+  // figure with gavel (chancellor)
+  chancellor:`<svg viewBox="0 0 56 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g class="ff d0" style="color:var(--figure)">
+      <circle cx="23" cy="9" r="8" fill="currentColor"/>
+      <path d="M13 23c0-5 20-5 20 0l-2 15H15Z" fill="currentColor"/>
+      <line x1="13" y1="26" x2="6" y2="33" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>
+      <line x1="33" y1="26" x2="41" y2="21" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>
+      <rect x="39" y="13" width="14" height="7" rx="2.5" fill="currentColor" opacity=".85"/>
+      <line x1="46" y1="20" x2="41" y2="31" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="16" y1="38" x2="12" y2="50" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>
+      <line x1="30" y1="38" x2="34" y2="50" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>
+    </g>
+  </svg>`,
+
+  // signed document with checkmark
+  published:`<svg viewBox="0 0 50 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="6" y="4" width="34" height="44" rx="4" class="sv-fsu2"/>
+    <rect x="6" y="4" width="34" height="44" rx="4" stroke="rgba(22,163,74,.5)" stroke-width="1.5"/>
+    <line x1="13" y1="16" x2="33" y2="16" class="sv-sub" stroke-width="1.4" stroke-linecap="round"/>
+    <line x1="13" y1="22" x2="33" y2="22" class="sv-sub" stroke-width="1.4" stroke-linecap="round"/>
+    <line x1="13" y1="28" x2="27" y2="28" class="sv-sub" stroke-width="1.4" stroke-linecap="round"/>
+    <line x1="13" y1="34" x2="24" y2="34" class="sv-sub" stroke-width="1.4" stroke-linecap="round"/>
+    <circle cx="37" cy="42" r="11" fill="#16a34a"/>
+    <path d="M31 42l5 5 9-10" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </svg>`,
+};
+
+// ── Arrow HTML ─────────────────────────────────────────────────────────────
+function arrow() {
+  return `<div class="arw">
+    <svg width="32" height="18" viewBox="0 0 32 18" overflow="visible">
+      <line x1="0" y1="9" x2="24" y2="9" class="aline"/>
+      <polygon points="24,4 32,9 24,14" class="ahead"/>
+    </svg>
+  </div>`;
+}
+
+// ── Phase data ─────────────────────────────────────────────────────────────
+const trackA = [
+  { key:'committee', label:'Committee\nVote',    desc:'Bylaws committee reviews and votes on proposed language' },
+  { key:'ec',        label:'EC\nReview',          desc:'Executive Committee reviews the proposal' },
+  { key:'agenda',    label:'Senate\nAgenda',      desc:'Placed on the full Senate meeting agenda' },
+  { key:'senate',    label:'Senate\nFloor',       desc:'Full senate debates and votes on the amendment' },
+  { key:'counsel',   label:'General\nCounsel',    desc:'University legal reviews language and compliance' },
+  { key:'provost',   label:'Provost\nReview',     desc:"Provost's office endorses the revision" },
+  { key:'president', label:'President\nReview',   desc:'President signs — 20-day review period begins', deadline:20 },
+  { key:'chancellor',label:'Chancellor\nReview',  desc:'NSHE Chancellor signs — final system approval', deadline:45 },
+  { key:'published', label:'Published',           desc:'Amendment ratified and takes effect', done:true },
+];
+
+const trackB = [
+  { key:'committee', label:'Unit\nDrafting',    desc:'Academic unit drafts revised unit bylaws' },
+  { key:'ec',        label:'Submitted\nOFA',    desc:'Draft submitted to the Office of Faculty Affairs' },
+  { key:'agenda',    label:'OFA\nReview',        desc:'OFA reviews for consistency with governance policy' },
+  { key:'counsel',   label:'General\nCounsel',   desc:'Legal review for compliance with NSHE policy' },
+  { key:'provost',   label:'Provost\nReview',    desc:'Provost endorses the unit bylaws revision' },
+  { key:'president', label:'President\nReview',  desc:'Presidential sign-off on revised unit bylaws', deadline:20 },
+  { key:'chancellor',label:'Chancellor\nReview', desc:'Chancellor issues final system-level approval', deadline:45 },
+  { key:'published', label:'Published',          desc:'Unit bylaws revision takes effect', done:true },
+];
+
+// ── Build a row ────────────────────────────────────────────────────────────
+function buildRow(phases, containerId) {
+  const row = document.getElementById(containerId);
+  phases.forEach((p, i) => {
+    const node = document.createElement('div');
+    node.className = 'pnode';
+    const labelHtml = p.label.replace(/\n/g, '<br>');
+    const deadlinePill = p.deadline
+      ? `<div class="deadline-pill">⏱ ${p.deadline}d limit</div>`
+      : '';
+    node.innerHTML = `
+      <div class="step-num">${i + 1}</div>
+      <div class="pcard${p.done ? ' done' : ''}">
+        <div class="pfig">${S[p.key]}</div>
+        <div class="plabel">${labelHtml}</div>
+        ${deadlinePill}
+        <div class="pdesc">${p.desc}</div>
+      </div>`;
+    row.appendChild(node);
+    if (i < phases.length - 1) {
+      row.insertAdjacentHTML('beforeend', arrow());
+    }
+  });
+}
+
+buildRow(trackA, 'rowA');
+buildRow(trackB, 'rowB');
+</script>
+</body>
 </html>

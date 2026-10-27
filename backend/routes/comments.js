@@ -42,7 +42,7 @@ router.post('/', (req, res) => {
 
 // DELETE /api/tickets/:ticketId/comments/:id
 router.delete('/:id', (req, res) => {
-  const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(req.params.id);
+  const comment = db.prepare('SELECT * FROM comments WHERE id = ? AND ticket_id = ?').get(req.params.id, req.params.ticketId);
   if (!comment) return res.status(404).json({ error: 'Comment not found' });
   if (comment.author_id !== req.user.id && req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Cannot delete this comment' });

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" href="img/logo.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ticket — UNLV Bylaws Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,9 +17,18 @@
 .comment-author { font-weight: 600; font-size: 0.88rem; }
 .comment-time { font-size: 0.78rem; color: var(--muted); margin-left: 8px; }
 .comment-body { margin-top: 6px; font-size: 0.9rem; line-height: 1.55; white-space: pre-wrap; }
-.attach-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
-.attach-item:last-child { border-bottom: none; }
+.attach-row { border-bottom: 1px solid var(--border); }
+.attach-row:last-child { border-bottom: none; }
+.attach-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 0.88rem; }
 .attach-icon { width: 32px; height: 32px; border-radius: 6px; background: var(--panel); display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+.attach-preview-pane { display: none; border-radius: 8px; overflow: hidden; background: var(--panel); margin-bottom: 8px; border: 1px solid var(--border); position: relative; }
+.attach-preview-pane.open { display: block; }
+.attach-preview-pane iframe { display: block; width: 100%; height: 520px; border: none; }
+.attach-preview-pane img { display: block; max-width: 100%; max-height: 480px; margin: 0 auto; }
+.attach-preview-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: var(--muted); background: var(--panel); }
+.btn-preview { background: none; border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: border-color .15s, color .15s; white-space: nowrap; font-family: var(--font); }
+.btn-preview:hover, .btn-preview.active { border-color: var(--scarlet); color: var(--scarlet); }
+.btn-preview svg { flex-shrink: 0; }
 .deadline-banner { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 0.88rem; color: #fca5a5; }
 </style>
 </head>
@@ -26,7 +36,7 @@
 
 <nav class="topnav">
   <div class="topnav-inner">
-    <a href="dashboard.html" class="nav-brand">
+    <a href="/BylawsTracker/" class="nav-brand">
       <img src="img/logo.png" alt="" style="width:30px;height:30px;border-radius:7px;object-fit:cover;">
       Bylaws Tracker<span class="dot">.</span>
     </a>
@@ -142,7 +152,6 @@ if (!ticketId) window.location.href = 'dashboard.html';
 const user = getUser();
 let ticket;
 
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function daysSince(dateStr) {
   if (!dateStr) return null;
@@ -154,7 +163,7 @@ async function load() {
     ticket = await apiFetch(`/tickets/${ticketId}`);
     render();
   } catch (err) {
-    document.getElementById('loading').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    document.getElementById('loading').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
   }
 }
 
@@ -246,19 +255,185 @@ function render() {
 function renderAttachments(attachments) {
   const el = document.getElementById('attachments-list');
   if (!attachments.length) { el.innerHTML = '<div class="text-muted text-sm">No attachments yet.</div>'; return; }
+
+  const me = getUser();
   el.innerHTML = attachments.map(a => {
-    const icon = a.mime_type?.includes('pdf') ? '📄' : a.mime_type?.includes('word') ? '📝' : '📎';
+    const isPdf   = a.mime_type?.includes('pdf');
+    const isImage = a.mime_type?.startsWith('image/');
+    const isDocx  = a.mime_type?.includes('word') || a.original_name?.toLowerCase().endsWith('.docx');
+    const isXlsx  = a.mime_type?.includes('sheet') || a.mime_type?.includes('excel') || a.original_name?.toLowerCase().endsWith('.xlsx');
+    const canPreview = isPdf || isImage || isDocx || isXlsx;
+    const icon = isPdf ? '📄' : isImage ? '🖼️' : isDocx ? '📝' : isXlsx ? '📊' : '📎';
+
+    const canDelete = me && (me.id === a.uploaded_by || me.role === 'admin' || me.role === 'bylaws_chair' || me.role === 'senate_manager');
+
+    const previewBtn = canPreview ? `
+      <button class="btn-preview preview-trigger" id="prev-btn-${a.id}" data-id="${a.id}" data-mime="${escHtml(a.mime_type||'')}" data-name="${escHtml(a.original_name||'')}">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+        </svg>
+        Preview
+      </button>` : '';
+
+    const deleteBtn = canDelete ? `
+      <button class="btn-preview delete-trigger" style="color:var(--danger,#ef4444);border-color:transparent;" title="Delete attachment" data-id="${a.id}">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+        </svg>
+      </button>` : '';
+
+    const previewPane = canPreview ? `
+      <div class="attach-preview-pane" id="prev-pane-${a.id}">
+        <div class="attach-preview-loading" id="prev-loading-${a.id}">Loading…</div>
+      </div>` : '';
+
     return `
-      <div class="attach-item">
-        <div class="attach-icon">${icon}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(a.original_name)}</div>
-          <div class="text-xs text-muted">${(a.size/1024).toFixed(1)} KB · ${a.uploaded_by_name||''} · ${relativeTime(a.uploaded_at)}</div>
+      <div class="attach-row" id="attach-row-${a.id}">
+        <div class="attach-item">
+          <div class="attach-icon">${icon}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(a.original_name)}</div>
+            <div class="text-xs text-muted">${(a.size/1024).toFixed(1)} KB · ${escHtml(a.uploaded_by_name||'')} · ${relativeTime(a.uploaded_at)}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            ${previewBtn}
+            <a href="/BylawsTracker/api/tickets/${ticketId}/attachments/${a.id}/download" class="btn btn-secondary btn-sm" title="Download">↓</a>
+            ${deleteBtn}
+          </div>
         </div>
-        <a href="/BylawsTracker/api/tickets/${ticketId}/attachments/${a.id}/download" target="_blank" class="btn btn-secondary btn-sm">↓</a>
+        ${previewPane}
       </div>
     `;
   }).join('');
+
+  // Wire up preview and delete buttons without inline onclick (avoids attribute injection)
+  el.querySelectorAll('.preview-trigger').forEach(btn => {
+    btn.addEventListener('click', () => togglePreview(+btn.dataset.id, btn.dataset.mime, btn.dataset.name));
+  });
+  el.querySelectorAll('.delete-trigger').forEach(btn => {
+    btn.addEventListener('click', () => deleteAttachment(+btn.dataset.id));
+  });
+}
+
+async function deleteAttachment(attachmentId) {
+  if (!confirm('Delete this attachment? This cannot be undone.')) return;
+  try {
+    await apiFetch(`/tickets/${ticketId}/attachments/${attachmentId}`, { method: 'DELETE' });
+    const row = document.getElementById(`attach-row-${attachmentId}`);
+    if (row) row.remove();
+    if (_blobUrls[attachmentId]) { URL.revokeObjectURL(_blobUrls[attachmentId]); delete _blobUrls[attachmentId]; }
+    // Re-check if list is empty
+    const el = document.getElementById('attachments-list');
+    if (!el.querySelector('.attach-row')) el.innerHTML = '<div class="text-muted text-sm">No attachments yet.</div>';
+  } catch (err) {
+    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
+  }
+}
+
+// Blob URLs we've created — revoked when the ticket page reloads
+const _blobUrls = {};
+
+function _loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function togglePreview(attachmentId, mimeType, originalName) {
+  const pane    = document.getElementById(`prev-pane-${attachmentId}`);
+  const btn     = document.getElementById(`prev-btn-${attachmentId}`);
+  const loading = document.getElementById(`prev-loading-${attachmentId}`);
+
+  if (pane.classList.contains('open')) {
+    pane.classList.remove('open');
+    btn.classList.remove('active');
+    return;
+  }
+
+  pane.classList.add('open');
+  btn.classList.add('active');
+
+  // Already rendered — just show
+  if (_blobUrls[attachmentId]) return;
+
+  if (loading) loading.style.display = 'flex';
+
+  const isPdf   = mimeType?.includes('pdf');
+  const isImage = mimeType?.startsWith('image/');
+  const isDocx  = mimeType?.includes('word') || originalName?.toLowerCase().endsWith('.docx');
+  const isXlsx  = mimeType?.includes('sheet') || mimeType?.includes('excel') || originalName?.toLowerCase().endsWith('.xlsx');
+
+  try {
+    const resp = await fetch(
+      `/BylawsTracker/api/tickets/${ticketId}/attachments/${attachmentId}/download`,
+      { headers: { Authorization: `Bearer ${getToken()}` } }
+    );
+    if (!resp.ok) throw new Error('Failed to load file');
+    const blob = await resp.blob();
+
+    if (loading) loading.remove();
+
+    if (isPdf) {
+      const url = URL.createObjectURL(blob);
+      _blobUrls[attachmentId] = url;
+      // <embed> works more reliably than <iframe> for blob: PDFs in Firefox
+      const embed = document.createElement('embed');
+      embed.src = url;
+      embed.type = 'application/pdf';
+      embed.style.cssText = 'width:100%;height:520px;border:none;display:block;';
+      pane.appendChild(embed);
+
+    } else if (isImage) {
+      const url = URL.createObjectURL(blob);
+      _blobUrls[attachmentId] = url;
+      const img = document.createElement('img');
+      img.src = url; img.alt = '';
+      pane.appendChild(img);
+
+    } else if (isDocx) {
+      await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
+      const arrayBuffer = await blob.arrayBuffer();
+      const result = await mammoth.convertToHtml({ arrayBuffer });
+      _blobUrls[attachmentId] = 'rendered';
+      // Use sandboxed srcdoc iframe — mammoth HTML never executes in our page context
+      const iframe = document.createElement('iframe');
+      iframe.sandbox = '';
+      iframe.style.cssText = 'width:100%;height:520px;border:none;background:#fff;';
+      iframe.srcdoc = result.value || '<em>Empty document.</em>';
+      pane.appendChild(iframe);
+
+    } else if (isXlsx) {
+      await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+      const arrayBuffer = await blob.arrayBuffer();
+      const wb = XLSX.read(arrayBuffer, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      _blobUrls[attachmentId] = 'rendered';
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'overflow:auto;max-height:520px;font-size:0.8rem;';
+      const table = document.createElement('table');
+      table.style.cssText = 'border-collapse:collapse;width:100%;';
+      rows.forEach((row, ri) => {
+        const tr = document.createElement('tr');
+        row.forEach(cell => {
+          const td = document.createElement(ri === 0 ? 'th' : 'td');
+          td.style.cssText = 'border:1px solid var(--border);padding:4px 8px;white-space:nowrap;color:var(--text);' + (ri === 0 ? 'background:var(--surface2);font-weight:600;' : '');
+          td.textContent = String(cell ?? '');
+          tr.appendChild(td);
+        });
+        table.appendChild(tr);
+      });
+      wrapper.appendChild(table);
+      pane.appendChild(wrapper);
+    }
+
+  } catch (err) {
+    if (loading) { loading.style.display = 'flex'; loading.textContent = 'Could not load preview.'; }
+    else { const e = document.createElement('div'); e.className = 'attach-preview-loading'; e.textContent = 'Could not load preview.'; pane.appendChild(e); }
+  }
 }
 
 function renderComments(comments) {
@@ -281,7 +456,7 @@ async function advancePhase() {
     await apiFetch(`/tickets/${ticketId}/advance`, { method: 'POST' });
     await load();
   } catch (err) {
-    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
     btn.disabled = false; btn.textContent = 'Advance to Next Phase';
   }
 }
@@ -293,7 +468,7 @@ async function toggleStuck() {
     await apiFetch(`/tickets/${ticketId}/stuck`, { method: 'POST' });
     await load();
   } catch (err) {
-    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
     btn.disabled = false;
   }
 }
@@ -326,7 +501,7 @@ document.getElementById('comment-submit').addEventListener('click', async () => 
     document.getElementById('comment-input').value = '';
     await load();
   } catch (err) {
-    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
   }
   btn.disabled = false;
 });

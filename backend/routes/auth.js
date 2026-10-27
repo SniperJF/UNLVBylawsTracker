@@ -19,8 +19,10 @@ const authLimiter = rateLimit({
   skipSuccessfulRequests: true,
 });
 
+const VALID_ROLES = ['admin','bylaws_chair','senate_manager','ec_member','provost_office','unit_submitter','read_only'];
+
 // POST /api/auth/register
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   const { email, name, password, role_requested, reason } = req.body;
   if (!email || !name || !password) return res.status(400).json({ error: 'Missing required fields' });
   if (typeof email !== 'string' || email.length > 254) return res.status(400).json({ error: 'Invalid email' });
@@ -44,7 +46,7 @@ router.post('/register', async (req, res) => {
     db.prepare(`
       INSERT INTO account_requests (email, name, role_requested, reason)
       VALUES (?, ?, ?, ?)
-    `).run(email.toLowerCase(), name.trim(), role_requested || 'read_only', (reason || '').slice(0, 1000));
+    `).run(email.toLowerCase(), name.trim(), VALID_ROLES.includes(role_requested) ? role_requested : 'read_only', (reason || '').slice(0, 1000));
 
     await sendVerificationEmail(email.toLowerCase(), name.trim(), token);
     res.json({ message: 'Registration submitted. Check your email to verify, then await admin approval.' });
@@ -104,7 +106,7 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
 });
 
 // POST /api/auth/reset-password
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', authLimiter, async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'Missing fields' });
   if (typeof password !== 'string' || password.length < 8 || password.length > 128) {
