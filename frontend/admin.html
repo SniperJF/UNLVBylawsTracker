@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/main.css">
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"></script>
+<script src="js/xlsx.mini.min.js"></script>
 <style>
 .tab-bar { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
 .tab { padding: 10px 16px; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 0.9rem; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; font-family: var(--font); transition: color 0.15s; }
@@ -414,14 +414,16 @@ document.getElementById('dl-zip').addEventListener('click', async () => {
     const a = document.createElement('a');
     a.href = url;
     a.download = `bylaws-attachments-${new Date().toISOString().slice(0,10)}.zip`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   } catch (err) { showAlert(err.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Download Attachments (.zip)'; }
 });
 
 loadRequests();
 </script>
-<footer class="site-footer">Built by <strong>FRG</strong> &nbsp;·&nbsp; UNLV Faculty Senate Bylaws Tracker</footer>
+<footer class="site-footer">Built by <a href="https://jorge-fonseca.com" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;"><strong>FRG</strong></a> &nbsp;·&nbsp; UNLV Faculty Senate Bylaws Tracker</footer>
 </body>
 </html>

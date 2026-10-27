@@ -51,7 +51,7 @@ router.get('/backup/data', (req, res) => {
   res.json({ exported_at: new Date().toISOString(), tickets, history, comments, attachments, users, audit_log: auditLog });
 });
 
-// GET /api/admin/backup/zip — stream zip of all uploaded attachments
+// GET /api/admin/backup/zip — build and serve zip of all uploaded attachments
 router.get('/backup/zip', (req, res) => {
   const attachments = db.prepare(`
     SELECT a.*, t.title as ticket_title
@@ -60,18 +60,32 @@ router.get('/backup/zip', (req, res) => {
   `).all();
 
   const date = new Date().toISOString().slice(0, 10);
-  res.setHeader('Content-Type', 'application/zip');
-  res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''bylaws-attachments-${date}.zip`);
-
+  // Write to temp file so nginx can serve it with Content-Length (avoids streaming buffer issues)
+  const os = require('os');
+  const tmpFile = path.join(os.tmpdir(), `bylaws-backup-${Date.now()}.zip`);
+  const output = fs.createWriteStream(tmpFile);
   const archive = archiver('zip', { zlib: { level: 6 } });
-  archive.on('error', err => { console.error('[backup/zip]', err); res.end(); });
-  archive.pipe(res);
+
+  archive.on('error', err => {
+    console.error('[backup/zip]', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Archive failed' });
+  });
+
+  output.on('close', () => {
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''bylaws-attachments-${date}.zip`);
+    res.sendFile(tmpFile, (err) => {
+      fs.unlink(tmpFile, () => {});
+      if (err && !res.headersSent) res.status(500).json({ error: 'Send failed' });
+    });
+  });
+
+  archive.pipe(output);
 
   for (const att of attachments) {
     const filePath = path.join(uploadsDir, att.filename);
     if (!fs.existsSync(filePath)) continue;
-    const folder = `ticket-${att.ticket_id}`;
-    archive.file(filePath, { name: `${folder}/${att.original_name}` });
+    archive.file(filePath, { name: `ticket-${att.ticket_id}/${att.original_name}` });
   }
 
   archive.finalize();

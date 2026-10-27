@@ -297,7 +297,7 @@ function renderAttachments(attachments) {
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
             ${previewBtn}
-            <a href="/BylawsTracker/api/tickets/${ticketId}/attachments/${a.id}/download" class="btn btn-secondary btn-sm" title="Download">↓</a>
+            <button class="btn btn-secondary btn-sm dl-trigger" data-id="${a.id}" data-name="${escHtml(a.original_name)}" title="Download">↓</button>
             ${deleteBtn}
           </div>
         </div>
@@ -306,13 +306,37 @@ function renderAttachments(attachments) {
     `;
   }).join('');
 
-  // Wire up preview and delete buttons without inline onclick (avoids attribute injection)
+  // Wire up preview, download, and delete buttons
   el.querySelectorAll('.preview-trigger').forEach(btn => {
     btn.addEventListener('click', () => togglePreview(+btn.dataset.id, btn.dataset.mime, btn.dataset.name));
+  });
+  el.querySelectorAll('.dl-trigger').forEach(btn => {
+    btn.addEventListener('click', () => downloadAttachment(+btn.dataset.id, btn.dataset.name));
   });
   el.querySelectorAll('.delete-trigger').forEach(btn => {
     btn.addEventListener('click', () => deleteAttachment(+btn.dataset.id));
   });
+}
+
+async function downloadAttachment(attachmentId, originalName) {
+  try {
+    const resp = await fetch(
+      `/BylawsTracker/api/tickets/${ticketId}/attachments/${attachmentId}/download`,
+      { headers: { Authorization: `Bearer ${getToken()}` } }
+    );
+    if (!resp.ok) throw new Error('Download failed');
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = originalName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (err) {
+    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
+  }
 }
 
 async function deleteAttachment(attachmentId) {
@@ -439,14 +463,41 @@ async function togglePreview(attachmentId, mimeType, originalName) {
 function renderComments(comments) {
   const el = document.getElementById('comments-list');
   if (!comments.length) { el.innerHTML = '<div class="text-muted text-sm" style="margin-bottom:12px;">No comments yet.</div>'; return; }
-  el.innerHTML = comments.map(c => `
-    <div class="comment">
-      <span class="comment-author">${escHtml(c.author_name)}</span>
-      <span class="role-tag" style="font-size:0.7rem;margin-left:6px;">${(c.author_role||'').replace(/_/g,' ')}</span>
-      <span class="comment-time">${relativeTime(c.created_at)}</span>
+  const me = getUser();
+  el.innerHTML = comments.map(c => {
+    const canDelete = me && (me.id === c.author_id || me.role === 'admin');
+    return `
+    <div class="comment" id="comment-${c.id}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <span class="comment-author">${escHtml(c.author_name)}</span>
+          <span class="role-tag" style="font-size:0.7rem;margin-left:6px;">${(c.author_role||'').replace(/_/g,' ')}</span>
+          <span class="comment-time">${relativeTime(c.created_at)}</span>
+        </div>
+        ${canDelete ? `<button class="btn-preview comment-delete-btn" data-cid="${c.id}" style="color:var(--danger,#ef4444);border-color:transparent;" title="Delete comment">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>` : ''}
+      </div>
       <div class="comment-body">${escHtml(c.body)}</div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.comment-delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => deleteComment(+btn.dataset.cid));
+  });
+}
+
+async function deleteComment(commentId) {
+  if (!confirm('Delete this comment?')) return;
+  try {
+    await apiFetch(`/tickets/${ticketId}/comments/${commentId}`, { method: 'DELETE' });
+    const el = document.getElementById(`comment-${commentId}`);
+    if (el) el.remove();
+    const list = document.getElementById('comments-list');
+    if (!list.querySelector('.comment')) list.innerHTML = '<div class="text-muted text-sm" style="margin-bottom:12px;">No comments yet.</div>';
+  } catch (err) {
+    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
+  }
 }
 
 async function advancePhase() {
@@ -508,6 +559,6 @@ document.getElementById('comment-submit').addEventListener('click', async () => 
 
 load();
 </script>
-<footer class="site-footer">Built by <strong>FRG</strong> &nbsp;·&nbsp; UNLV Faculty Senate Bylaws Tracker</footer>
+<footer class="site-footer">Built by <a href="https://jorge-fonseca.com" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;"><strong>FRG</strong></a> &nbsp;·&nbsp; UNLV Faculty Senate Bylaws Tracker</footer>
 </body>
 </html>
