@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { logAudit } = require('../middleware/audit');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -109,6 +110,7 @@ router.post('/', requireRole(...CREATOR_ROLES), (req, res) => {
   const ticketId = result.lastInsertRowid;
   db.prepare('INSERT INTO ticket_phase_history (ticket_id, phase, entered_by) VALUES (?, ?, ?)').run(ticketId, initial_phase, req.user.id);
 
+  logAudit(req.user.id, req.user.name, 'ticket.create', 'ticket', ticketId, { title: title.trim() }, req.ip);
   res.status(201).json({ id: ticketId, message: 'Ticket created' });
 });
 
@@ -159,6 +161,7 @@ router.post('/:id/advance', requireRole(...MOVER_ROLES), (req, res) => {
     createNotification(ticket.assignee_id, 'phase_change', `"${ticket.title}" moved to ${next_phase}`, ticket.id);
   }
 
+  logAudit(req.user.id, req.user.name, 'ticket.advance', 'ticket', ticket.id, { from: ticket.current_phase, to: next_phase }, req.ip);
   res.json({ message: 'Advanced', new_phase: next_phase });
 });
 
@@ -173,6 +176,7 @@ router.post('/:id/stuck', requireRole(...MOVER_ROLES), (req, res) => {
   if (ticket.originator_id) {
     createNotification(ticket.originator_id, 'stuck_change', `"${ticket.title}" marked ${newStatus}`, ticket.id);
   }
+  logAudit(req.user.id, req.user.name, 'ticket.stuck', 'ticket', ticket.id, { status: newStatus }, req.ip);
   res.json({ message: 'Updated', status: newStatus });
 });
 
@@ -191,6 +195,7 @@ router.post('/:id/phase', requireRole('admin','bylaws_chair','senate_manager'), 
 
   const newStatus = phase === 'PUBLISHED' ? 'published' : ticket.status === 'published' ? 'active' : ticket.status;
   db.prepare('UPDATE tickets SET current_phase = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(phase, newStatus, ticket.id);
+  logAudit(req.user.id, req.user.name, 'ticket.phase_set', 'ticket', ticket.id, { phase }, req.ip);
   res.json({ message: 'Phase set', new_phase: phase });
 });
 

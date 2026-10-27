@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { sendApprovalEmail } = require('../email');
+const { logAudit } = require('../middleware/audit');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -40,6 +41,7 @@ router.post('/:id/approve', requireRole('admin'), async (req, res) => {
     .run(req.user.id, user.email);
 
   await sendApprovalEmail(user.email, user.name).catch(() => {});
+  logAudit(req.user.id, req.user.name, 'user.approve', 'user', user.id, { role: assignedRole }, req.ip);
   res.json({ message: 'User approved' });
 });
 
@@ -50,6 +52,7 @@ router.post('/:id/reject', requireRole('admin'), (req, res) => {
 
   db.prepare('UPDATE account_requests SET status = "rejected", reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE email = ? AND status = "pending"')
     .run(req.user.id, user.email);
+  logAudit(req.user.id, req.user.name, 'user.reject', 'user', user.id, null, req.ip);
   res.json({ message: 'Request rejected' });
 });
 
@@ -60,6 +63,7 @@ router.patch('/:id/role', requireRole('admin'), (req, res) => {
   if (!validRoles.includes(role)) return res.status(400).json({ error: 'Invalid role' });
 
   db.prepare('UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(role, req.params.id);
+  logAudit(req.user.id, req.user.name, 'user.role_change', 'user', +req.params.id, { role }, req.ip);
   res.json({ message: 'Role updated' });
 });
 
@@ -73,6 +77,7 @@ router.post('/:id/reset-password', requireRole('admin'), async (req, res) => {
 
   const hash = await bcrypt.hash(new_password, 12);
   db.prepare('UPDATE users SET password_hash = ?, pw_version = pw_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(hash, req.params.id);
+  logAudit(req.user.id, req.user.name, 'user.password_reset', 'user', +req.params.id, null, req.ip);
   res.json({ message: 'Password reset — user sessions invalidated' });
 });
 

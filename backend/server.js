@@ -28,6 +28,7 @@ const userRoutes = require('./routes/users');
 const notifRoutes = require('./routes/notifications');
 const commentRoutes = require('./routes/comments');
 const attachmentRoutes = require('./routes/attachments');
+const adminRoutes = require('./routes/admin');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
@@ -35,6 +36,7 @@ app.use('/api/tickets/:ticketId/comments', commentRoutes);
 app.use('/api/tickets/:ticketId/attachments', attachmentRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/notifications', notifRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Serve uploaded files (auth required — files are outside web root)
 const { uploadsDir } = require('./middleware/upload');

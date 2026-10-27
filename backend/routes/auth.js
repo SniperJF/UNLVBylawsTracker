@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../email');
 const { requireAuth } = require('../middleware/auth');
+const { logAudit } = require('../middleware/audit');
 
 const router = express.Router();
 
@@ -87,6 +88,7 @@ router.post('/login', authLimiter, async (req, res) => {
     process.env.JWT_SECRET,
     { expiresIn: '8h' }
   );
+  logAudit(user.id, user.name, 'auth.login', 'user', user.id, null, req.ip);
   res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
 });
 
@@ -158,6 +160,7 @@ router.post('/sse-token', requireAuth, (req, res) => {
 // POST /api/auth/logout — purge this user's SSE tokens immediately
 router.post('/logout', requireAuth, (req, res) => {
   db.prepare('DELETE FROM sse_tokens WHERE user_id = ?').run(req.user.id);
+  logAudit(req.user.id, req.user.name, 'auth.logout', 'user', req.user.id, null, req.ip);
   res.json({ message: 'Logged out' });
 });
 

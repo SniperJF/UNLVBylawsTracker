@@ -4,6 +4,7 @@ const fs = require('fs');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { upload, uploadsDir } = require('../middleware/upload');
+const { logAudit } = require('../middleware/audit');
 
 const router = express.Router({ mergeParams: true });
 router.use(requireAuth);
@@ -74,6 +75,7 @@ router.delete('/:id', (req, res) => {
   }
   const filePath = path.join(uploadsDir, attachment.filename);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  logAudit(req.user.id, req.user.name, 'attachment.delete', 'attachment', attachment.id, { ticket_id: +req.params.ticketId, name: attachment.original_name }, req.ip);
   db.prepare('DELETE FROM ticket_attachments WHERE id = ?').run(req.params.id);
   res.json({ message: 'Deleted' });
 });

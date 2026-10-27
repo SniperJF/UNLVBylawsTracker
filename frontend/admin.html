@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/main.css">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"></script>
 <style>
 .tab-bar { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
 .tab { padding: 10px 16px; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 0.9rem; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; font-family: var(--font); transition: color 0.15s; }
@@ -61,6 +62,8 @@
   <div class="tab-bar">
     <button class="tab active" data-tab="requests">Pending Requests <span id="req-count" style="background:var(--scarlet);color:white;padding:1px 7px;border-radius:10px;font-size:0.75rem;margin-left:4px;"></span></button>
     <button class="tab" data-tab="users">All Users</button>
+    <button class="tab" data-tab="audit">Audit Log</button>
+    <button class="tab" data-tab="backup">Backup</button>
   </div>
 
   <!-- Pending Requests -->
@@ -75,6 +78,45 @@
         <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="users-body"></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- Audit Log -->
+  <div class="tab-panel" id="tab-audit">
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+      <input type="text" id="audit-filter-action" placeholder="Filter by action…" style="min-width:180px;" class="form-control">
+      <select id="audit-filter-actor" class="form-control" style="min-width:160px;">
+        <option value="">All users</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" id="audit-apply">Apply</button>
+      <button class="btn btn-secondary btn-sm" id="audit-clear">Clear</button>
+      <span id="audit-total" class="text-sm text-muted"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Entity</th><th>Details</th><th>IP</th></tr></thead>
+        <tbody id="audit-body"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button class="btn btn-secondary btn-sm" id="audit-prev" disabled>← Prev</button>
+      <button class="btn btn-secondary btn-sm" id="audit-next">Next →</button>
+    </div>
+  </div>
+
+  <!-- Backup -->
+  <div class="tab-panel" id="tab-backup">
+    <div style="display:grid;gap:16px;max-width:560px;">
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:6px;">Excel Backup</div>
+        <div class="text-sm text-muted" style="margin-bottom:14px;">Downloads all tickets, users, comments, phase history, and attachments metadata as a multi-sheet Excel workbook.</div>
+        <button class="btn btn-primary" id="dl-excel">Download Excel (.xlsx)</button>
+      </div>
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:6px;">Attachments ZIP</div>
+        <div class="text-sm text-muted" style="margin-bottom:14px;">Downloads every uploaded file (PDFs, Word docs, etc.) organized by ticket number in a ZIP archive.</div>
+        <button class="btn btn-primary" id="dl-zip">Download Attachments (.zip)</button>
+      </div>
     </div>
   </div>
 </div>
@@ -113,6 +155,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     tab.classList.add('active');
     document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
     if (tab.dataset.tab === 'users') loadUsers();
+    if (tab.dataset.tab === 'audit') loadAudit();
   });
 });
 
@@ -242,6 +285,140 @@ function showAlert(msg, type) {
   document.getElementById('alert-area').innerHTML = `<div class="alert alert-${'success'===type?'success':'error'}">${escHtml(msg)}</div>`;
   setTimeout(() => { document.getElementById('alert-area').innerHTML = ''; }, 4000);
 }
+
+// ── Audit Log ──────────────────────────────────────────────────────────────
+let auditOffset = 0;
+const AUDIT_LIMIT = 100;
+let auditTotal = 0;
+
+async function loadAudit() {
+  const action = document.getElementById('audit-filter-action').value.trim();
+  const actorId = document.getElementById('audit-filter-actor').value;
+  const params = new URLSearchParams({ limit: AUDIT_LIMIT, offset: auditOffset });
+  if (action) params.set('action', action);
+  if (actorId) params.set('actor_id', actorId);
+
+  try {
+    const { rows, total } = await apiFetch('/admin/audit-log?' + params);
+    auditTotal = total;
+    document.getElementById('audit-total').textContent = `${total} total entries`;
+    document.getElementById('audit-prev').disabled = auditOffset === 0;
+    document.getElementById('audit-next').disabled = auditOffset + AUDIT_LIMIT >= total;
+
+    document.getElementById('audit-body').innerHTML = rows.length
+      ? rows.map(r => {
+          let detailStr = '';
+          try { const d = JSON.parse(r.details || 'null'); detailStr = d ? Object.entries(d).map(([k,v]) => `${k}: ${v}`).join(', ') : ''; } catch {}
+          const actionBadge = r.action.startsWith('auth') ? 'var(--muted)' : r.action.includes('delete') ? 'var(--danger)' : r.action.includes('create') ? '#16a34a' : 'var(--scarlet)';
+          return `<tr>
+            <td class="text-sm text-muted" style="white-space:nowrap;">${relativeTime(r.created_at)}<br><span style="font-size:.65rem;">${r.created_at.slice(0,16).replace('T',' ')}</span></td>
+            <td class="text-sm"><strong>${escHtml(r.actor_name || '—')}</strong></td>
+            <td><span style="font:.7rem/1 var(--mono);background:${actionBadge}22;color:${actionBadge};padding:2px 6px;border-radius:4px;">${escHtml(r.action)}</span></td>
+            <td class="text-xs text-muted">${r.entity_type ? escHtml(r.entity_type) + (r.entity_id ? ' #' + r.entity_id : '') : '—'}</td>
+            <td class="text-xs text-muted">${escHtml(detailStr) || '—'}</td>
+            <td class="text-xs text-muted">${escHtml(r.ip || '—')}</td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:20px;">No entries</td></tr>';
+
+    // Populate actor filter on first load
+    if (!document.getElementById('audit-filter-actor').children.length > 1) return;
+    const users = await apiFetch('/users');
+    const sel = document.getElementById('audit-filter-actor');
+    users.forEach(u => {
+      if ([...sel.options].some(o => o.value === String(u.id))) return;
+      const opt = document.createElement('option');
+      opt.value = u.id; opt.textContent = u.name;
+      sel.appendChild(opt);
+    });
+  } catch (err) {
+    document.getElementById('audit-body').innerHTML = `<tr><td colspan="6"><div class="alert alert-error">${escHtml(err.message)}</div></td></tr>`;
+  }
+}
+
+document.getElementById('audit-apply').addEventListener('click', () => { auditOffset = 0; loadAudit(); });
+document.getElementById('audit-clear').addEventListener('click', () => {
+  document.getElementById('audit-filter-action').value = '';
+  document.getElementById('audit-filter-actor').value = '';
+  auditOffset = 0; loadAudit();
+});
+document.getElementById('audit-prev').addEventListener('click', () => { auditOffset = Math.max(0, auditOffset - AUDIT_LIMIT); loadAudit(); });
+document.getElementById('audit-next').addEventListener('click', () => { auditOffset += AUDIT_LIMIT; loadAudit(); });
+
+// ── Backup ─────────────────────────────────────────────────────────────────
+document.getElementById('dl-excel').addEventListener('click', async () => {
+  const btn = document.getElementById('dl-excel');
+  btn.disabled = true; btn.textContent = 'Building…';
+  try {
+    const data = await apiFetch('/admin/backup/data');
+    const wb = XLSX.utils.book_new();
+
+    const ticketRows = data.tickets.map(t => ({
+      ID: t.id, Type: t.type, Title: t.title, Description: t.description,
+      'Bylaws Section': t.bylaws_section, Phase: t.current_phase, Status: t.status,
+      Originator: t.originator_name, Assignee: t.assignee_name,
+      'Unit Name': t.unit_name, Created: t.created_at, Updated: t.updated_at
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ticketRows), 'Tickets');
+
+    const userRows = data.users.map(u => ({
+      ID: u.id, Name: u.name, Email: u.email, Role: u.role,
+      Approved: u.approved ? 'Yes' : 'No', 'Email Verified': u.email_verified ? 'Yes' : 'No',
+      Created: u.created_at
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(userRows), 'Users');
+
+    const commentRows = data.comments.map(c => ({
+      ID: c.id, 'Ticket ID': c.ticket_id, Author: c.author_name,
+      Body: c.body, Created: c.created_at
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(commentRows), 'Comments');
+
+    const historyRows = data.history.map(h => ({
+      ID: h.id, 'Ticket ID': h.ticket_id, Phase: h.phase,
+      'Entered By': h.entered_by_name, 'Entered At': h.entered_at, 'Exited At': h.exited_at || ''
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(historyRows), 'Phase History');
+
+    const attachRows = data.attachments.map(a => ({
+      ID: a.id, 'Ticket ID': a.ticket_id, 'Original Name': a.original_name,
+      'MIME Type': a.mime_type, 'Size (bytes)': a.size,
+      'Uploaded By': a.uploaded_by_name, 'Uploaded At': a.uploaded_at
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(attachRows), 'Attachments');
+
+    const auditRows = data.audit_log.map(a => ({
+      ID: a.id, Actor: a.actor_name, Action: a.action,
+      'Entity Type': a.entity_type, 'Entity ID': a.entity_id,
+      Details: a.details || '', IP: a.ip || '', Created: a.created_at
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(auditRows), 'Audit Log');
+
+    const date = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `bylaws-backup-${date}.xlsx`);
+  } catch (err) { showAlert(err.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Download Excel (.xlsx)'; }
+});
+
+document.getElementById('dl-zip').addEventListener('click', async () => {
+  const btn = document.getElementById('dl-zip');
+  btn.disabled = true; btn.textContent = 'Preparing…';
+  try {
+    const token = localStorage.getItem('bylaws_token');
+    const res = await fetch('/BylawsTracker/api/admin/backup/zip', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bylaws-attachments-${new Date().toISOString().slice(0,10)}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) { showAlert(err.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Download Attachments (.zip)'; }
+});
 
 loadRequests();
 </script>
