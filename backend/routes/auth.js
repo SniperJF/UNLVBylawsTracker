@@ -10,7 +10,8 @@ const { logAudit } = require('../middleware/audit');
 
 const router = express.Router();
 
-// Brute-force protection on login and forgot-password
+// Brute-force protection. Keyed on IP + email so one person's typos don't lock
+// out everyone else sharing a campus NAT address.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
@@ -18,12 +19,23 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many attempts — try again in 15 minutes' },
   skipSuccessfulRequests: true,
+  keyGenerator: (req) => `${req.ip}:${String(req.body?.email || '').toLowerCase()}`,
+});
+
+// Backstop against spraying many different accounts from one address.
+const ipLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts from this network — try again later' },
+  skipSuccessfulRequests: true,
 });
 
 const VALID_ROLES = ['admin','bylaws_chair','senate_manager','ec_member','provost_office','unit_submitter','read_only'];
 
 // POST /api/auth/register
-router.post('/register', authLimiter, async (req, res) => {
+router.post('/register', ipLimiter, authLimiter, async (req, res) => {
   const { email, name, password, role_requested, reason } = req.body;
   if (!email || !name || !password) return res.status(400).json({ error: 'Missing required fields' });
   if (typeof email !== 'string' || email.length > 254) return res.status(400).json({ error: 'Invalid email' });
@@ -69,7 +81,7 @@ router.get('/verify', (req, res) => {
 });
 
 // POST /api/auth/login
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/login', ipLimiter, authLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Missing credentials' });
 
@@ -93,7 +105,7 @@ router.post('/login', authLimiter, async (req, res) => {
 });
 
 // POST /api/auth/forgot-password
-router.post('/forgot-password', authLimiter, async (req, res) => {
+router.post('/forgot-password', ipLimiter, authLimiter, async (req, res) => {
   const { email } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(((email || '') + '').toLowerCase());
   // Always return success to prevent enumeration
@@ -108,7 +120,7 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
 });
 
 // POST /api/auth/reset-password
-router.post('/reset-password', authLimiter, async (req, res) => {
+router.post('/reset-password', ipLimiter, authLimiter, async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'Missing fields' });
   if (typeof password !== 'string' || password.length < 8 || password.length > 128) {

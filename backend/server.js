@@ -7,6 +7,11 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust exactly one proxy hop (nginx on localhost). Without this req.ip is
+// always 127.0.0.1, which makes the login rate limiter a single global bucket
+// shared by every user, and renders audit-log IPs useless.
+app.set('trust proxy', 1);
+
 // Security headers first
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'same-origin' },
