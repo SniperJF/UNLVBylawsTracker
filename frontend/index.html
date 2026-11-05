@@ -181,6 +181,27 @@ body{
   max-width:520px;margin:0 auto 48px;line-height:1.7;
 }
 
+/* ── Featured video ──────────────────────────────────────── */
+.vid-feature{margin:0 auto 56px;max-width:860px;padding:0 4px}
+.vid-frame{
+  position:relative;aspect-ratio:16/9;border-radius:14px;overflow:hidden;
+  background:#000;border:1px solid var(--border);
+  box-shadow:0 18px 50px rgba(0,0,0,.28);
+}
+.vid-frame video{display:block;width:100%;height:100%;object-fit:contain;background:#000}
+.vid-cap{
+  display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap;
+  margin-top:14px;text-align:center;color:var(--sub);font-size:.86rem;line-height:1.6;
+}
+.vid-badge{
+  font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--scarlet);border:1px solid var(--scarlet);
+  border-radius:999px;padding:3px 9px;white-space:nowrap;
+}
+.vid-fallback{color:var(--sub);font-size:.9rem;padding:20px;text-align:center}
+.vid-fallback a{color:var(--scarlet)}
+@media(max-width:600px){ .vid-frame{border-radius:10px} }
+
 /* ── Process ─────────────────────────────────────────────── */
 .process{padding:0 0 72px}
 .track-label{
@@ -377,7 +398,7 @@ body{
   <p class="hero-sub">A governance ticketing system for UNLV faculty senate bylaws amendments — from committee vote through chancellor approval.</p>
   <div class="hero-cta">
     <a href="login.html" class="btn-primary">Open the Tracker</a>
-    <a href="#process" class="btn-ghost">See the process</a>
+    <a href="#process" class="btn-ghost">▶ Watch how it works</a>
   </div>
 </section>
 
@@ -386,6 +407,24 @@ body{
   <p class="sec-eyebrow">Governance Lifecycle</p>
   <h2 class="sec-h2">The amendment pipeline</h2>
   <p class="sec-desc">University bylaws amendments follow a structured approval chain. Every ticket maps exactly to one of two tracks.</p>
+
+  <!-- Walkthrough. No autoplay: the clip is narrated, so it only plays on request. -->
+  <figure class="vid-feature">
+    <div class="vid-frame">
+      <video controls preload="metadata" playsinline width="1280" height="720"
+             aria-label="Animated walkthrough of the Track A bylaws amendment process">
+        <source src="media/bylaws-process.mp4" type="video/mp4">
+        <p class="vid-fallback">
+          Your browser cannot play this video.
+          <a href="media/bylaws-process.mp4" download>Download the walkthrough</a> instead.
+        </p>
+      </video>
+    </div>
+    <figcaption class="vid-cap">
+      <span class="vid-badge">Watch first</span>
+      <span>How a Track A amendment travels from committee vote to publication — 43 seconds, with narration.</span>
+    </figcaption>
+  </figure>
 
   <div style="margin-bottom:48px">
     <div class="track-label">Track A — University Bylaws Amendments</div>
