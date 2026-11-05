@@ -279,7 +279,7 @@ function renderAttachments(attachments) {
     const canPreview = isPdf || isImage || isDocx || isXlsx;
     const icon = isPdf ? '📄' : isImage ? '🖼️' : isDocx ? '📝' : isXlsx ? '📊' : '📎';
 
-    const canDelete = me && (me.id === a.uploaded_by || me.role === 'admin' || me.role === 'bylaws_chair' || me.role === 'senate_manager');
+    const canDelete = me && (me.id === a.uploaded_by || isAdminRole(me.role) || me.role === 'bylaws_chair');
 
     const previewBtn = canPreview ? `
       <button class="btn-preview preview-trigger" id="prev-btn-${a.id}" data-id="${a.id}" data-mime="${escHtml(a.mime_type||'')}" data-name="${escHtml(a.original_name||'')}">
@@ -480,7 +480,7 @@ function renderComments(comments) {
   if (!comments.length) { el.innerHTML = '<div class="text-muted text-sm" style="margin-bottom:12px;">No comments yet.</div>'; return; }
   const me = getUser();
   el.innerHTML = comments.map(c => {
-    const canDelete = me && (me.id === c.author_id || me.role === 'admin');
+    const canDelete = me && (me.id === c.author_id || isAdminRole(me.role));
     return `
     <div class="comment" id="comment-${c.id}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">

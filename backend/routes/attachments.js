@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, ADMIN_ROLES } = require('../middleware/auth');
 const { upload, uploadsDir } = require('../middleware/upload');
 const { logAudit } = require('../middleware/audit');
 
@@ -68,7 +68,7 @@ router.delete('/:id', (req, res) => {
   const attachment = db.prepare('SELECT * FROM ticket_attachments WHERE id = ? AND ticket_id = ?').get(req.params.id, req.params.ticketId);
   if (!attachment) return res.status(404).json({ error: 'Attachment not found' });
 
-  if (attachment.uploaded_by !== req.user.id && req.user.role !== 'admin') {
+  if (attachment.uploaded_by !== req.user.id && !ADMIN_ROLES.includes(req.user.role)) {
     return res.status(403).json({ error: 'Cannot delete this attachment' });
   }
 

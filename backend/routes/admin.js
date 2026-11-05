@@ -3,11 +3,11 @@ const path = require('path');
 const fs = require('fs');
 const archiver = require('archiver');
 const db = require('../db');
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadsDir } = require('../middleware/upload');
 
 const router = express.Router();
-router.use(requireAuth, requireRole('admin'));
+router.use(requireAuth, requireAdmin);
 
 // GET /api/admin/audit-log?limit=200&offset=0&action=&actor_id=
 router.get('/audit-log', (req, res) => {

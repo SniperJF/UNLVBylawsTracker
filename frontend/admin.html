@@ -184,11 +184,13 @@ async function loadRequests() {
             </div>
           </div>
           <div class="flex gap-2 items-center">
-            <select class="form-control" id="role-sel-${r.id}" style="font-size:0.85rem;padding:6px 10px;">
+            <select class="form-control" id="role-sel-${r.user_id}" style="font-size:0.85rem;padding:6px 10px;" ${r.user_id ? '' : 'disabled'}>
               ${ROLES.map(role => `<option value="${role}" ${role === r.role_requested ? 'selected' : ''}>${role.replace(/_/g,' ')}</option>`).join('')}
             </select>
-            <button class="btn btn-primary btn-sm" onclick="approveUser(${r.id})">Approve</button>
-            <button class="btn btn-danger btn-sm" onclick="rejectUser(${r.id})">Reject</button>
+            ${r.user_id
+              ? `<button class="btn btn-primary btn-sm" onclick="approveUser(${r.user_id})">Approve</button>
+                 <button class="btn btn-danger btn-sm" onclick="rejectUser(${r.user_id})">Reject</button>`
+              : `<span class="text-xs text-warning">No matching account</span>`}
           </div>
         </div>
       </div>

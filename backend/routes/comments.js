@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, ADMIN_ROLES } = require('../middleware/auth');
 const { logAudit } = require('../middleware/audit');
 
 const router = express.Router({ mergeParams: true });
@@ -45,7 +45,7 @@ router.post('/', (req, res) => {
 router.delete('/:id', (req, res) => {
   const comment = db.prepare('SELECT * FROM comments WHERE id = ? AND ticket_id = ?').get(req.params.id, req.params.ticketId);
   if (!comment) return res.status(404).json({ error: 'Comment not found' });
-  if (comment.author_id !== req.user.id && req.user.role !== 'admin') {
+  if (comment.author_id !== req.user.id && !ADMIN_ROLES.includes(req.user.role)) {
     return res.status(403).json({ error: 'Cannot delete this comment' });
   }
   logAudit(req.user.id, req.user.name, 'comment.delete', 'comment', comment.id, { ticket_id: +req.params.ticketId, preview: comment.body.slice(0, 80) }, req.ip);

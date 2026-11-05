@@ -32,4 +32,9 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { requireAuth, requireRole };
+// Roles with full administrative access: user management, password resets,
+// audit log, and backups.
+const ADMIN_ROLES = ['admin', 'senate_manager'];
+const requireAdmin = requireRole(...ADMIN_ROLES);
+
+module.exports = { requireAuth, requireRole, requireAdmin, ADMIN_ROLES };

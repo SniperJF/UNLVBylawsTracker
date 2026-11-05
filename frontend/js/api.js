@@ -71,9 +71,13 @@ function requireLogin() {
   }
 }
 
+// Roles with full administrative access — must match ADMIN_ROLES on the server
+const ADMIN_ROLES = ['admin', 'senate_manager'];
+function isAdminRole(role) { return ADMIN_ROLES.includes(role); }
+
 function requireAdmin() {
   const user = getUser();
-  if (!user || user.role !== 'admin') {
+  if (!user || !isAdminRole(user.role)) {
     window.location.href = '/BylawsTracker/dashboard.html';
   }
 }
@@ -108,7 +112,7 @@ function statusBadge(status, phase) {
 function renderNav(activePage) {
   const user = getUser();
   if (!user) return;
-  const isAdmin = user.role === 'admin';
+  const isAdmin = isAdminRole(user.role);
 
   document.getElementById('nav-user-name').textContent = user.name.split(' ')[0];
   document.getElementById('nav-role').textContent = user.role.replace(/_/g, ' ');
