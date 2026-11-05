@@ -65,6 +65,28 @@
 .pad-foot textarea:focus { outline:none; border-color:var(--scarlet); }
 .pad-send { border:none; background:var(--scarlet); color:#fff; border-radius:9px; padding:9px 14px; cursor:pointer; font-weight:600; font-size:.85rem; }
 .pad-send:disabled { opacity:.45; cursor:not-allowed; }
+/* markdown inside a reply */
+.pad-msg.bot { white-space:normal; }
+.pad-msg.bot p { margin:0 0 7px; }
+.pad-msg.bot p:last-child { margin-bottom:0; }
+.pad-msg.bot ul, .pad-msg.bot ol { margin:0 0 7px; padding-left:19px; }
+.pad-msg.bot li { margin:2px 0; }
+.pad-msg.bot code { font-family:var(--mono); font-size:.8em; background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:1px 4px; }
+.pad-msg.bot a { color:var(--scarlet); }
+.pad-msg.bot .pad-h { display:block; margin:6px 0 4px; font-size:.9rem; }
+.pad-msg.bot strong { font-weight:700; color:var(--text); }
+.pad-did { margin-top:8px; padding-top:7px; border-top:1px dashed var(--border); display:flex; flex-wrap:wrap; gap:5px; }
+.pad-did span { font-family:var(--mono); font-size:.65rem; color:var(--muted); background:var(--surface);
+  border:1px solid var(--border); border-radius:999px; padding:2px 8px; }
+
+/* what Padmé is pointing at */
+@keyframes padmeSpot {
+  0%,100% { box-shadow:0 0 0 0 rgba(220,38,38,0); }
+  12%     { box-shadow:0 0 0 4px rgba(220,38,38,.55); }
+  60%     { box-shadow:0 0 0 4px rgba(220,38,38,.28); }
+}
+.padme-spot { animation:padmeSpot 2.6s ease-out; border-radius:7px; scroll-margin:90px; position:relative; z-index:2; }
+
 @media (max-width:520px) {
   .pad-win { inset:8px; width:auto; height:auto; }
   .pad-launch span { display:none; }
@@ -75,21 +97,240 @@
   let state = { open: false, max: false, busy: false, msgs: [] };
   let el = {};
 
+  // ── Page actions ────────────────────────────────────────────────────────────
+  // Padmé may point at, click, or type into things on the page. Guardrails are
+  // enforced here regardless of what the model says: page text is untrusted and
+  // could try to steer it into destructive clicks.
+  const ATTR = 'data-padme-id';
+  const MAX_ITEMS = 90, MAX_ROWS = 25, MAX_LABEL = 70;
+
+  // Never click anything whose label suggests it changes or destroys state.
+  const UNSAFE = /\b(save|submit|delete|remove|approve|reject|assign|release|done|confirm|edit|update|add|create|upload|import|export|download|sync|run|start|stop|clear|reset|log ?out|sign ?out|send|mark|archive|restore|apply|accept|decline|verify|retry|advance|stuck|publish|post|resolve|deny|grant)\b/i;
+  const ACTION_WORDS = /\b(sort|order|open|go|take me|bring me|navigate|click|press|tap|switch|filter|search|find|look up|type|enter|select|expand|collapse|next|previous|tab|show me the)\b/i;
+  // Admin is user management and backups; never act there.
+  const NO_ACT_PAGES = /^(admin|login|profile)\.html$/;
+
+  const wantsAction = (s) => ACTION_WORDS.test(s);
+  const pageName = () => location.pathname.split('/').pop() || '';
+  const clean = (s) => (s || '').replace(/[↕↑↓⇅▲▼]/g, ' ').replace(/\s+/g, ' ').trim();
+  const cut = (s) => (s.length > MAX_LABEL ? s.slice(0, MAX_LABEL - 1) + '…' : s);
+  const TAG = /\[\[\s*(show|click|type)\s+(e\d+)\s*(?:\|\s*([^\]]*))?\]\]/gi;
+
+  function stripTags(raw) {
+    return String(raw).replace(TAG, '').replace(/\[\[[^\]]*\]?$/, '').replace(/\n{3,}/g, '\n\n').trimEnd();
+  }
+  function parseActions(raw) {
+    const acts = [];
+    String(raw).replace(TAG, (_m, verb, id, arg) => {
+      acts.push({ verb: verb.toLowerCase(), id, text: arg ? arg.trim() : undefined });
+      return '';
+    });
+    return acts.slice(0, 2);
+  }
+
+  function visible(el) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) return false;
+    const cs = getComputedStyle(el);
+    return cs.visibility !== 'hidden' && cs.display !== 'none';
+  }
+  function kindOf(el) {
+    const t = el.tagName;
+    if (t === 'A') return 'link';
+    if (t === 'TH') return 'header';
+    if (t === 'TR') return 'row';
+    if (/^H[1-4]$/.test(t)) return 'section';
+    if (t === 'INPUT' || t === 'TEXTAREA') return 'searchbox';
+    if (el.getAttribute('role') === 'tab') return 'tab';
+    if (el.classList.contains('tab')) return 'tab';
+    return 'button';
+  }
+  function isSearchBox(el) {
+    if (el.tagName === 'TEXTAREA' || el.disabled || el.readOnly) return false;
+    if (!['text', 'search', ''].includes((el.getAttribute('type') || '').toLowerCase())) return false;
+    return /search|filter|find|title|keyword/i.test(`${el.placeholder} ${el.getAttribute('aria-label') || ''} ${el.id}`);
+  }
+  function labelOf(el) {
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+      return clean(el.getAttribute('aria-label') || el.placeholder || el.id)
+           + (el.value ? ` (now: "${clean(el.value).slice(0, 30)}")` : '');
+    }
+    if (el.tagName === 'TR') {
+      return Array.from(el.children).slice(0, 4).map(c => clean(c.innerText)).filter(Boolean).join(' · ');
+    }
+    return clean(el.getAttribute('aria-label') || el.innerText || el.getAttribute('title'));
+  }
+  function shortName(el, kind) {
+    const t = kind === 'row' ? labelOf(el).split(' · ')[0] : labelOf(el).replace(/ \(now: .*$/, '');
+    return (t.length > 40 ? t.slice(0, 39) + '…' : t) || kind;
+  }
+  function canClick(el, kind, text) {
+    if (NO_ACT_PAGES.test(pageName())) return false;
+    if (el.closest('[data-padme="off"]') || el.isContentEditable) return false;
+    if (UNSAFE.test(text)) return false;
+    if (kind === 'link') {
+      const href = el.getAttribute('href') || '';
+      if (el.hasAttribute('download')) return false;
+      if (!(href.startsWith('/') || href.startsWith('#') || /^[\w.-]+\.html/.test(href))) return false;
+      if (href.startsWith('//') || /\/api\//i.test(href)) return false;
+      return true;
+    }
+    if (kind === 'button') {
+      const form = el.form;
+      if (form && (el.type || 'submit') === 'submit' && form.getAttribute('role') !== 'search') return false;
+      return true;
+    }
+    if (kind === 'row') return getComputedStyle(el).cursor === 'pointer';
+    if (kind === 'header') return el.hasAttribute('aria-sort') || !!el.querySelector('button') || getComputedStyle(el).cursor === 'pointer';
+    return kind === 'tab';
+  }
+
+  // Stamp on-screen items and describe them for the model. Runs while the widget
+  // is hidden so Padmé never lists her own controls.
+  function inventoryPage(root) {
+    document.querySelectorAll(`[${ATTR}]`).forEach(e => e.removeAttribute(ATTR));
+    if (!root) return '';
+    const widget = document.getElementById('pad-root');
+    const sel = 'a[href], button, [role=tab], .tab, th, h1, h2, h3, h4, input, tbody tr';
+    const lines = [], seen = new Set();
+    let rows = 0, n = 0;
+    for (const e of Array.from(root.querySelectorAll(sel))) {
+      if (n >= MAX_ITEMS) break;
+      if ((widget && widget.contains(e)) || !visible(e)) continue;
+      if (e.tagName === 'INPUT' && !isSearchBox(e)) continue;
+      if (e.disabled) continue;
+      if ((e.tagName === 'BUTTON' || e.tagName === 'A') && e.closest('th')) continue;
+      const kind = kindOf(e);
+      if (kind === 'row' && ++rows > MAX_ROWS) continue;
+      const text = labelOf(e);
+      if (!text) continue;
+      const key = `${kind}:${text}`;
+      if (kind !== 'row' && seen.has(key)) continue;
+      seen.add(key);
+      const id = `e${++n}`;
+      e.setAttribute(ATTR, id);
+      const ok = canClick(e, kind, text);
+      const suffix = kind === 'row' ? (ok ? ' (opens)' : '')
+        : kind === 'header' ? (ok ? ' (click to sort)' : '')
+        : (kind === 'section' || kind === 'searchbox') ? ''
+        : ok ? '' : ' (show only)';
+      const href = kind === 'link' ? (e.getAttribute('href') || '') : '';
+      lines.push(`${id} ${kind}: ${cut(text)}${href && !href.startsWith('http') ? ` -> ${href}` : ''}${suffix}`);
+    }
+    return lines.join('\n');
+  }
+
+  function spotlight(e) {
+    e.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    e.classList.remove('padme-spot');
+    void e.offsetWidth; // restart the animation
+    e.classList.add('padme-spot');
+    setTimeout(() => e.classList.remove('padme-spot'), 2600);
+  }
+
+  function pressEnter(input) {
+    if (!input.isConnected) return;
+    const o = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true };
+    const handled = !input.dispatchEvent(new KeyboardEvent('keydown', o));
+    input.dispatchEvent(new KeyboardEvent('keypress', o));
+    input.dispatchEvent(new KeyboardEvent('keyup', o));
+    const form = input.form;
+    if (!handled && form && form.getAttribute('role') === 'search') form.requestSubmit();
+  }
+
+  function runAction(a, allowAct) {
+    if (!/^e\d{1,3}$/.test(a.id)) return null;
+    const e = document.querySelector(`[${ATTR}="${a.id}"]`);
+    const widget = document.getElementById('pad-root');
+    if (!e || (widget && widget.contains(e))) return null;
+    const kind = kindOf(e);
+    const name = shortName(e, kind);
+    const act = allowAct && !NO_ACT_PAGES.test(pageName()) && !e.closest('[data-padme="off"]');
+
+    if (a.verb === 'type') {
+      if (!act || kind !== 'searchbox' || !isSearchBox(e) || a.text == null) { spotlight(e); return `Showing: ${name}`; }
+      const value = a.text.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120);
+      e.value = value;
+      e.dispatchEvent(new Event('input', { bubbles: true }));
+      spotlight(e);
+      e.focus({ preventScroll: true });
+      setTimeout(() => pressEnter(e), 500);
+      return `Searched "${value.slice(0, 40)}"`;
+    }
+    if (a.verb === 'click' && act && canClick(e, kind, labelOf(e))) {
+      spotlight(e);
+      setTimeout(() => e.click(), 350);
+      return `Clicked: ${name}`;
+    }
+    spotlight(e);
+    return `Showing: ${name}`;
+  }
+
   // Capture what the user is actually looking at. The widget hides itself first
   // so the captured text is the page, not Padmé's own conversation echoed back.
-  function capturePage() {
+  function capturePage(withItems) {
     const w = document.getElementById('pad-root');
     const prev = w ? w.style.display : null;
     if (w) w.style.display = 'none';
     let text = (document.body?.innerText || '')
       .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    // Stamp the actionable items while the widget is still hidden.
+    const items = withItems ? inventoryPage(document.querySelector('.page-wrap') || document.body) : '';
     if (w) w.style.display = prev || 'contents';
     if (text.length < 40) return null;
-    if (text.length > PAGE_TEXT_MAX) text = text.slice(0, PAGE_TEXT_MAX);
-    return { url: location.pathname + location.search + location.hash, title: document.title || '', text };
+    const cap = withItems ? 7000 : PAGE_TEXT_MAX;
+    if (text.length > cap) text = text.slice(0, cap);
+    return {
+      url: location.pathname + location.search + location.hash,
+      title: document.title || '',
+      text,
+      ...(items ? { items } : {}),
+    };
   }
 
   function avatar(cls) { return `<img src="img/padme.webp" alt="" class="${cls || ''}">`; }
+
+  // Minimal markdown → HTML. Escapes first, so model output is never injected raw.
+  function md(src) {
+    const lines = escHtml(src).split('\n');
+    let out = '', list = null;
+
+    const inline = (s) => s
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, '$1<em>$2</em>')
+      .replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,;:!?]|$)/g, '$1<em>$2</em>')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+    const closeList = () => { if (list) { out += `</${list}>`; list = null; } };
+
+    for (let raw of lines) {
+      const line = raw.trimEnd();
+      if (!line.trim()) { closeList(); continue; }
+
+      const h = line.match(/^(#{1,4})\s+(.*)$/);
+      if (h) { closeList(); out += `<b class="pad-h">${inline(h[2])}</b>`; continue; }
+
+      const ul = line.match(/^\s*[-*+]\s+(.*)$/);
+      if (ul) {
+        if (list !== 'ul') { closeList(); out += '<ul>'; list = 'ul'; }
+        out += `<li>${inline(ul[1])}</li>`;
+        continue;
+      }
+      const ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
+      if (ol) {
+        if (list !== 'ol') { closeList(); out += '<ol>'; list = 'ol'; }
+        out += `<li>${inline(ol[1])}</li>`;
+        continue;
+      }
+
+      closeList();
+      out += `<p>${inline(line)}</p>`;
+    }
+    closeList();
+    return out;
+  }
 
   function scrollDown() { if (el.body) el.body.scrollTop = el.body.scrollHeight; }
 
@@ -97,7 +338,12 @@
     el.body.innerHTML = state.msgs.map(m => {
       if (m.role === 'user') return `<div class="pad-msg user">${escHtml(m.content)}</div>`;
       const cls = m.error ? 'pad-msg bot err' : 'pad-msg bot';
-      return `<div class="pad-row">${avatar()}<div class="${cls}">${escHtml(m.content) || '<span class="pad-dots"><span></span><span></span><span></span></span>'}</div></div>`;
+      // Strip any action tag still mid-stream so "[[cli" never flashes on screen.
+      const shown = m.error ? escHtml(m.content) : md(stripTags(m.content));
+      const inner = m.content ? shown : '<span class="pad-dots"><span></span><span></span><span></span></span>';
+      const note = (m.done && m.done.length)
+        ? `<div class="pad-did">${m.done.map(d => `<span>${escHtml(d)}</span>`).join('')}</div>` : '';
+      return `<div class="pad-row">${avatar()}<div class="${cls}">${inner}${note}</div></div>`;
     }).join('');
     scrollDown();
   }
@@ -130,6 +376,7 @@
     }
 
     el.input.value = '';
+    const sentFrom = pageName();
     state.busy = true;
     el.send.disabled = true;
     el.quick.style.display = 'none';
@@ -144,7 +391,7 @@
       const res = await fetch('/BylawsTracker/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ message: msg, history, pageContext: capturePage() }),
+        body: JSON.stringify({ message: msg, history, pageContext: capturePage(true) }),
       });
 
       if (!res.ok) {
@@ -175,7 +422,14 @@
           renderMsgs();
         }
       }
-      if (!slot.content) { slot.content = 'I came back empty-pawed — try asking again.'; slot.error = true; renderMsgs(); }
+      if (!slot.content) { slot.content = 'I came back empty-pawed — try asking again.'; slot.error = true; renderMsgs(); return; }
+
+      // Act on the page. Clicking and typing only when the user's own words asked
+      // for it AND they are still on the page the question was asked from;
+      // anything else degrades to a highlight.
+      const allowAct = wantsAction(msg) && pageName() === sentFrom;
+      const done = parseActions(slot.content).map(a => runAction(a, allowAct)).filter(Boolean);
+      if (done.length) { slot.done = done; renderMsgs(); }
     } catch (err) {
       slot.content = 'I could not reach the model just now.';
       slot.error = true;

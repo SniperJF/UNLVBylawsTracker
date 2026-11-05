@@ -11,6 +11,7 @@ const CHAT_MODEL = process.env.CHAT_MODEL || 'qwen3.8:27b';
 
 const MAX_MESSAGE_CHARS = 4000;
 const PAGE_CONTEXT_MAX_CHARS = 8000;
+const PAGE_ITEMS_MAX_CHARS = 4000;
 const MAX_HISTORY_TURNS = 12;
 
 const SYSTEM_PROMPT = `You are Padmé, the guide dog of the UNLV Faculty Senate Bylaws Tracker — a system that tracks bylaws amendments as they move through university governance.
@@ -37,10 +38,18 @@ WHAT YOU DO
 2. ANSWER GOVERNANCE QUESTIONS about the bylaws process, what a phase means, who acts next, or what a deadline implies. If you do not know, say so plainly; a good guide never leads someone down a wrong path.
 3. SHOW THE WAY FORWARD. When it helps, end with one short suggestion of what to check next.
 
+ACTING ON THE PAGE
+The page block may end with an "ON-SCREEN ITEMS" list, one item per line: "eN kind: label". You can point at these and use some of them, like a guide dog nudging the right door. Put each action tag on its own line at the very END of your reply, after your prose:
+- [[show e7]] — scroll to and highlight an item. Always allowed; use it whenever you mention something visible.
+- [[click e7]] — only for items that change the VIEW (open a ticket, switch a tab, sort a column, follow a link). Never for anything that saves, advances, deletes, approves, uploads or submits.
+- [[type e3 | grievance]] — only into a search or filter box; the interface presses Enter for you.
+Use at most TWO tags per reply, and only ids that appear in the list. Mention what you are doing in plain words too ("I'll open that ticket for you"). If the user only asked a question, prefer [[show]] over [[click]].
+
 RULES
 - Never invent ticket titles, numbers, dates or people that are not in the page block or the user's message.
 - Keep replies tight: a few sentences or a short list. This is a sidebar, not an essay.
-- You cannot change anything in the system — you read and explain. If the user wants to advance a ticket or edit data, tell them which page or button does it.`;
+- Use markdown for structure: **bold** for emphasis, "- " for bullets. Keep it light.
+- You cannot change data — you read, explain and navigate. If the user wants to advance a ticket or edit something, tell them which button does it rather than pressing it.`;
 
 // Heavy endpoint: one generation can occupy the shared GPU for a while.
 const chatLimiter = rateLimit({
@@ -59,7 +68,10 @@ function buildPageBlock(pageContext) {
   if (text.length > PAGE_CONTEXT_MAX_CHARS) text = text.slice(0, PAGE_CONTEXT_MAX_CHARS);
   const url = String(pageContext.url || '').slice(0, 300);
   const title = String(pageContext.title || '').slice(0, 300);
-  return `PAGE THE USER IS VIEWING\nURL: ${url}\nTitle: ${title}\n\n${text}`;
+  let block = `PAGE THE USER IS VIEWING\nURL: ${url}\nTitle: ${title}\n\n${text}`;
+  const items = String(pageContext.items || '').trim();
+  if (items) block += `\n\nON-SCREEN ITEMS\n${items.slice(0, PAGE_ITEMS_MAX_CHARS)}`;
+  return block;
 }
 
 // POST /api/chat/stream — Server-Sent Events relay of the model's reply

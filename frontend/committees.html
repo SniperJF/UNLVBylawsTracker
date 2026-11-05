@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="img/logo.png" type="image/png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Which Committee? — UNLV Bylaws Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/main.css">
+<style>
+.ask-box { display:flex; gap:10px; align-items:flex-end; }
+.ask-box textarea { flex:1; resize:vertical; min-height:74px; }
+.pick { border:1px solid var(--scarlet); border-radius:12px; padding:16px; background:var(--panel); margin-bottom:16px; }
+.pick-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.pick h3 { margin:0; font-size:1.05rem; }
+.pick-grp { font:.65rem/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--scarlet); margin-top:5px; }
+.chair { display:inline-flex; align-items:center; gap:7px; background:var(--surface); border:1px solid var(--border);
+  border-radius:999px; padding:5px 13px; font-size:.84rem; }
+.chair b { font-weight:700; }
+.answer { font-size:.95rem; line-height:1.65; }
+.answer p { margin:0 0 9px; } .answer p:last-child { margin-bottom:0; }
+.answer ul, .answer ol { margin:0 0 9px; padding-left:20px; }
+.answer strong { font-weight:700; }
+.cgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:12px; }
+.ccard { border:1px solid var(--border); border-radius:10px; padding:13px; background:var(--panel); }
+.ccard h4 { margin:0 0 3px; font-size:.92rem; }
+.ccard .charge { font-size:.78rem; color:var(--muted); line-height:1.5; margin:7px 0; }
+.ccard .meta { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:.76rem; }
+.ex { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.ex button { border:1px solid var(--border); background:var(--panel); color:var(--muted); font-family:var(--font);
+  font-size:.76rem; padding:6px 11px; border-radius:999px; cursor:pointer; }
+.ex button:hover { border-color:var(--scarlet); color:var(--scarlet); }
+</style>
+</head>
+<body class="app-layout">
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <a href="/BylawsTracker/" class="nav-brand">
+      <img src="img/logo.png" alt="" style="width:30px;height:30px;border-radius:7px;object-fit:cover;">
+      Bylaws Tracker<span class="dot">.</span>
+    </a>
+    <div class="nav-links">
+      <a href="dashboard.html" data-page="dashboard">Dashboard</a>
+      <a href="new-ticket.html" data-page="new">+ New Ticket</a>
+      <a href="committees.html" data-page="committees">Which Committee?</a>
+      <a href="admin.html" data-page="admin" data-admin>Admin</a>
+    </div>
+    <div class="nav-right">
+      <a href="notifications.html" class="notif-btn" title="Notifications">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="badge hidden" id="notif-badge"></span>
+      </a>
+      <div class="user-menu">
+        <button class="user-btn" id="user-btn">
+          <span id="nav-user-name"></span>
+          <span class="role-tag" id="nav-role"></span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="user-dropdown" id="user-dropdown">
+          <a href="profile.html">Change Password</a>
+          <button class="danger" id="logout-btn">Sign Out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="page-header">
+    <div class="section-title">Which Committee?</div>
+    <div class="section-sub">Describe your issue and Padmé points you at the right Faculty Senate committee</div>
+  </div>
+
+  <div id="alert-area"></div>
+
+  <!-- data-padme="off" — Padmé must not drive her own form -->
+  <div class="card mb-4" data-padme="off">
+    <div class="ask-box">
+      <textarea class="form-control" id="q" maxlength="1000"
+        placeholder="e.g. A faculty member wants to contest a promotion decision — who handles that?"></textarea>
+      <button class="btn btn-primary" id="ask">Ask</button>
+    </div>
+    <div class="ex" id="examples"></div>
+  </div>
+
+  <div id="result"></div>
+
+  <div class="page-header" style="margin-top:28px;">
+    <div class="section-title" style="font-size:1.15rem;">All Committees</div>
+    <div class="section-sub">Charge and chair pulled live from the Faculty Senate site</div>
+  </div>
+  <div id="dir"><div class="spinner" style="margin:30px auto;display:block;"></div></div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/padme.js"></script>
+<script>
+requireLogin();
+renderNav('committees');
+
+document.getElementById('user-btn').addEventListener('click', () => document.getElementById('user-dropdown').classList.toggle('open'));
+document.addEventListener('click', e => { if (!e.target.closest('.user-menu')) document.getElementById('user-dropdown').classList.remove('open'); });
+document.getElementById('logout-btn').addEventListener('click', () => { clearAuth(); window.location.href = 'login.html'; });
+
+const EXAMPLES = [
+  'Who reviews a new degree program proposal?',
+  'A faculty member wants to contest a promotion decision.',
+  'We need to change wording in the Faculty Senate bylaws.',
+  'Concerns about how AI is being used in grading.',
+  'Who decides general education requirements?',
+];
+
+document.getElementById('examples').innerHTML =
+  EXAMPLES.map(e => `<button data-q="${escHtml(e)}">${escHtml(e)}</button>`).join('');
+document.querySelectorAll('#examples button').forEach(b => {
+  b.addEventListener('click', () => { document.getElementById('q').value = b.dataset.q; ask(); });
+});
+
+// Shared light markdown renderer (same rules as the chat bubble).
+function mdLite(src) {
+  const inline = s => s
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, '$1<em>$2</em>');
+  let out = '', list = false;
+  for (const raw of escHtml(src).split('\n')) {
+    const line = raw.trim();
+    if (!line) { if (list) { out += '</ul>'; list = false; } continue; }
+    const li = line.match(/^[-*+]\s+(.*)$/);
+    if (li) { if (!list) { out += '<ul>'; list = true; } out += `<li>${inline(li[1])}</li>`; continue; }
+    if (list) { out += '</ul>'; list = false; }
+    out += `<p>${inline(line)}</p>`;
+  }
+  if (list) out += '</ul>';
+  return out;
+}
+
+function chairPill(c) {
+  if (!c.chair || /pending|election/i.test(c.chair)) {
+    return `<span class="chair" style="color:var(--muted);">Chair not currently listed</span>`;
+  }
+  return `<span class="chair">🪑 Chair: <b>${escHtml(c.chair)}</b></span>`;
+}
+
+async function ask() {
+  const q = document.getElementById('q').value.trim();
+  if (!q) return;
+  const btn = document.getElementById('ask');
+  const box = document.getElementById('result');
+  btn.disabled = true; btn.textContent = 'Thinking…';
+  box.innerHTML = '<div class="card"><div class="spinner" style="margin:10px auto;display:block;"></div></div>';
+  try {
+    const d = await apiFetch('/committees/ask', { method: 'POST', body: JSON.stringify({ question: q }) });
+    const c = d.committee;
+    box.innerHTML = `
+      ${c ? `<div class="pick">
+        <div class="pick-top">
+          <div>
+            <h3>${escHtml(c.name)} Committee</h3>
+            <div class="pick-grp">${escHtml(c.group)}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            ${chairPill(c)}
+            <a class="btn btn-secondary btn-sm" href="${escHtml(c.url)}" target="_blank" rel="noopener">Committee page ↗</a>
+          </div>
+        </div>
+        ${c.charge ? `<div class="text-sm text-muted" style="margin-top:11px;line-height:1.6;">${escHtml(c.charge)}</div>` : ''}
+      </div>` : ''}
+      <div class="card"><div class="answer">${mdLite(d.answer || '')}</div></div>`;
+  } catch (err) {
+    box.innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Ask';
+  }
+}
+
+document.getElementById('ask').addEventListener('click', ask);
+document.getElementById('q').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ask(); }
+});
+
+async function loadDirectory() {
+  try {
+    const list = await apiFetch('/committees');
+    const groups = {};
+    list.forEach(c => { (groups[c.group] = groups[c.group] || []).push(c); });
+    document.getElementById('dir').innerHTML = Object.entries(groups).map(([g, cs]) => `
+      <div style="margin-bottom:22px;">
+        <div class="pick-grp" style="margin-bottom:9px;">${escHtml(g)}</div>
+        <div class="cgrid">
+          ${cs.map(c => `
+            <div class="ccard">
+              <h4>${escHtml(c.name)}</h4>
+              <div class="charge">${c.charge ? escHtml(c.charge.slice(0, 190)) + (c.charge.length > 190 ? '…' : '') : 'Charge not published.'}</div>
+              <div class="meta">
+                ${chairPill(c)}
+                <a href="${escHtml(c.url)}" target="_blank" rel="noopener" style="color:var(--scarlet);text-decoration:none;white-space:nowrap;">Open ↗</a>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+  } catch (err) {
+    document.getElementById('dir').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
+  }
+}
+
+loadDirectory();
+</script>
+<footer class="site-footer">Built by <a href="https://jorge-fonseca.com" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;"><strong>FRG</strong></a> &nbsp;·&nbsp; UNLV Faculty Senate Bylaws Tracker</footer>
+</body>
+</html>
