@@ -29,7 +29,7 @@ router.get('/requests', requireRole('admin'), (req, res) => {
 // POST /api/users/:id/approve — admin approves + sets role
 router.post('/:id/approve', requireRole('admin'), async (req, res) => {
   const { role } = req.body;
-  const validRoles = ['admin','bylaws_chair','senate_manager','ec_member','provost_office','unit_submitter','read_only'];
+  const validRoles = ['admin','bylaws_chair','faculty_senate_chair','senate_manager','provost_office','unit_submitter','read_only'];
   if (role && !validRoles.includes(role)) return res.status(400).json({ error: 'Invalid role' });
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
@@ -59,7 +59,7 @@ router.post('/:id/reject', requireRole('admin'), (req, res) => {
 // PATCH /api/users/:id/role — admin changes role
 router.patch('/:id/role', requireRole('admin'), (req, res) => {
   const { role } = req.body;
-  const validRoles = ['admin','bylaws_chair','senate_manager','ec_member','provost_office','unit_submitter','read_only'];
+  const validRoles = ['admin','bylaws_chair','faculty_senate_chair','senate_manager','provost_office','unit_submitter','read_only'];
   if (!validRoles.includes(role)) return res.status(400).json({ error: 'Invalid role' });
 
   db.prepare('UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(role, req.params.id);

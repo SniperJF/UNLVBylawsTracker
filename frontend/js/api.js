@@ -99,7 +99,7 @@ function formatDate(dateStr) {
 function statusBadge(status, phase) {
   if (status === 'stuck') return '<span class="phase-badge phase-stuck">STUCK</span>';
   if (status === 'published') return '<span class="phase-badge phase-published">PUBLISHED</span>';
-  const waitPhases = ['PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PROVOST_REVIEW','GENERAL_COUNSEL','OFA_REVIEW'];
+  const waitPhases = ['PRESIDENT_REVIEW','CHANCELLOR_REVIEW','GENERAL_COUNSEL','OFA_REVIEW'];
   if (waitPhases.includes(phase)) return `<span class="phase-badge phase-waiting">${phase.replace(/_/g,' ')}</span>`;
   return `<span class="phase-badge phase-active">${phase.replace(/_/g,' ')}</span>`;
 }

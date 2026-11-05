@@ -159,7 +159,7 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
-const ROLES = ['admin','bylaws_chair','senate_manager','ec_member','provost_office','unit_submitter','read_only'];
+const ROLES = ['admin','bylaws_chair','faculty_senate_chair','senate_manager','provost_office','unit_submitter','read_only'];
 
 
 async function loadRequests() {
@@ -383,7 +383,8 @@ document.getElementById('dl-excel').addEventListener('click', async () => {
     const attachRows = data.attachments.map(a => ({
       ID: a.id, 'Ticket ID': a.ticket_id, 'Original Name': a.original_name,
       'MIME Type': a.mime_type, 'Size (bytes)': a.size,
-      'Uploaded By': a.uploaded_by_name, 'Uploaded At': a.uploaded_at
+      'Uploaded By': a.uploaded_by_name, 'Uploaded At': a.uploaded_at,
+      'Description': a.description || ''
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(attachRows), 'Attachments');
 

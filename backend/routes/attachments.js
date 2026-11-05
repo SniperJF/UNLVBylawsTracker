@@ -15,12 +15,14 @@ router.post('/', upload.array('files', 10), (req, res) => {
   if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
   if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
 
+  const description = String(req.body?.description || '').trim().slice(0, 500) || null;
+
   const inserted = req.files.map(file => {
     const result = db.prepare(`
-      INSERT INTO ticket_attachments (ticket_id, filename, original_name, mime_type, size, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(ticket.id, file.filename, file.originalname, file.mimetype, file.size, req.user.id);
-    return { id: result.lastInsertRowid, filename: file.filename, original_name: file.originalname, mime_type: file.mimetype, size: file.size };
+      INSERT INTO ticket_attachments (ticket_id, filename, original_name, mime_type, size, uploaded_by, description)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(ticket.id, file.filename, file.originalname, file.mimetype, file.size, req.user.id, description);
+    return { id: result.lastInsertRowid, filename: file.filename, original_name: file.originalname, mime_type: file.mimetype, size: file.size, description };
   });
 
   res.status(201).json(inserted);

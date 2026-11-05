@@ -280,6 +280,7 @@ body{
 .ff.d2{animation-delay:1.1s}
 .ff.d3{animation-delay:1.65s}
 .ff.d4{animation-delay:.3s}
+.ff.d5{animation-delay:.85s}
 
 @keyframes checkPop{
   0%,85%,100%{transform:scale(1)}
@@ -602,6 +603,58 @@ const S = {
     </g>
   </svg>`,
 
+  // campus-wide vote — a crowd with raised hands
+  campus:`<svg viewBox="0 0 104 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g class="ff d0" style="color:var(--figure)">
+      <circle cx="9" cy="11" r="5" fill="currentColor"/>
+      <path d="M4 21c0-3.5 10-3.5 10 0l-1 10H5Z" fill="currentColor"/>
+      <line x1="4" y1="23" x2="0" y2="29" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="14" y1="23" x2="14" y2="13" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+      <line x1="6" y1="31" x2="3" y2="41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="12" y1="31" x2="15" y2="41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <g class="ff d1" style="color:var(--figure)">
+      <circle cx="26" cy="11" r="5" fill="currentColor"/>
+      <path d="M21 21c0-3.5 10-3.5 10 0l-1 10H22Z" fill="currentColor"/>
+      <line x1="21" y1="23" x2="16" y2="29" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="31" y1="23" x2="35" y2="29" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="23" y1="31" x2="20" y2="41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="29" y1="31" x2="32" y2="41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <g class="ff d2" style="color:var(--figure)">
+      <circle cx="43" cy="11" r="5" fill="currentColor"/>
+      <path d="M38 21c0-3.5 10-3.5 10 0l-1 10H39Z" fill="currentColor"/>
+      <line x1="38" y1="23" x2="33" y2="29" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="48" y1="23" x2="48" y2="13" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+      <line x1="40" y1="31" x2="37" y2="41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="46" y1="31" x2="49" y2="41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <g class="ff d3" style="color:var(--figure)">
+      <circle cx="60" cy="11" r="5" fill="currentColor"/>
+      <path d="M55 21c0-3.5 10-3.5 10 0l-1 10H56Z" fill="currentColor"/>
+      <line x1="55" y1="23" x2="50" y2="29" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="65" y1="23" x2="69" y2="29" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="57" y1="31" x2="54" y2="41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="63" y1="31" x2="66" y2="41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <g class="ff d4" style="color:var(--figure)">
+      <circle cx="77" cy="11" r="5" fill="currentColor"/>
+      <path d="M72 21c0-3.5 10-3.5 10 0l-1 10H73Z" fill="currentColor"/>
+      <line x1="72" y1="23" x2="67" y2="29" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="82" y1="23" x2="82" y2="13" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+      <line x1="74" y1="31" x2="71" y2="41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="80" y1="31" x2="83" y2="41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <g class="ff d5" style="color:var(--figure)">
+      <circle cx="94" cy="11" r="5" fill="currentColor"/>
+      <path d="M89 21c0-3.5 10-3.5 10 0l-1 10H90Z" fill="currentColor"/>
+      <line x1="89" y1="23" x2="84" y2="29" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="99" y1="23" x2="103" y2="29" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="91" y1="31" x2="88" y2="41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="97" y1="31" x2="100" y2="41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </g>
+  </svg>`,
+
   // person with scales of justice
   counsel:`<svg viewBox="0 0 56 52" fill="none" xmlns="http://www.w3.org/2000/svg">
     <g class="ff d0" style="color:var(--figure)">
@@ -690,11 +743,11 @@ const trackA = [
   { key:'ec',        label:'EC\nReview',          desc:'Executive Committee reviews the proposal' },
   { key:'agenda',    label:'Senate\nAgenda',      desc:'Placed on the full Senate meeting agenda' },
   { key:'senate',    label:'Senate\nFloor',       desc:'Full senate debates and votes on the amendment' },
+  { key:'campus',    label:'Campus\nVote',        desc:'Amendment goes to a campus-wide faculty vote' },
   { key:'counsel',   label:'General\nCounsel',    desc:'University legal reviews language and compliance' },
-  { key:'provost',   label:'Provost\nReview',     desc:"Provost's office endorses the revision" },
-  { key:'president', label:'President\nReview',   desc:'President signs — 20-day review period begins', deadline:20 },
+  { key:'president', label:'President\nReview',   desc:'President signs — 20 day review period begins', deadline:20 },
   { key:'chancellor',label:'Chancellor\nReview',  desc:'NSHE Chancellor signs — final system approval', deadline:45 },
-  { key:'published', label:'Published',           desc:'Amendment ratified and takes effect', done:true },
+  { key:'provost',   label:'Provost\nPublished',  desc:'Provost office published the amendment on the website', done:true },
 ];
 
 const trackB = [
@@ -702,10 +755,9 @@ const trackB = [
   { key:'ec',        label:'Submitted\nOFA',    desc:'Draft submitted to the Office of Faculty Affairs' },
   { key:'agenda',    label:'OFA\nReview',        desc:'OFA reviews for consistency with governance policy' },
   { key:'counsel',   label:'General\nCounsel',   desc:'Legal review for compliance with NSHE policy' },
-  { key:'provost',   label:'Provost\nReview',    desc:'Provost endorses the unit bylaws revision' },
   { key:'president', label:'President\nReview',  desc:'Presidential sign-off on revised unit bylaws', deadline:20 },
   { key:'chancellor',label:'Chancellor\nReview', desc:'Chancellor issues final system-level approval', deadline:45 },
-  { key:'published', label:'Published',          desc:'Unit bylaws revision takes effect', done:true },
+  { key:'provost',   label:'Provost\nPublished', desc:'Provost office published the revision on the website', done:true },
 ];
 
 // ── Build a row ────────────────────────────────────────────────────────────
@@ -716,7 +768,7 @@ function buildRow(phases, containerId) {
     node.className = 'pnode';
     const labelHtml = p.label.replace(/\n/g, '<br>');
     const deadlinePill = p.deadline
-      ? `<div class="deadline-pill">⏱ ${p.deadline}d limit</div>`
+      ? `<div class="deadline-pill">⏱ ${p.deadline} Days limit</div>`
       : '';
     node.innerHTML = `
       <div class="step-num">${i + 1}</div>

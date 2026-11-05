@@ -32,7 +32,7 @@ const ipLimiter = rateLimit({
   skipSuccessfulRequests: true,
 });
 
-const VALID_ROLES = ['admin','bylaws_chair','senate_manager','ec_member','provost_office','unit_submitter','read_only'];
+const VALID_ROLES = ['admin','bylaws_chair','faculty_senate_chair','senate_manager','provost_office','unit_submitter','read_only'];
 
 // POST /api/auth/register
 router.post('/register', ipLimiter, authLimiter, async (req, res) => {

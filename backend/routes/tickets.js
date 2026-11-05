@@ -6,13 +6,13 @@ const { logAudit } = require('../middleware/audit');
 const router = express.Router();
 router.use(requireAuth);
 
-const TRACK_A_PHASES = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','GENERAL_COUNSEL','PROVOST_REVIEW','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
-const TRACK_B_PHASES = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PROVOST_REVIEW','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
+const TRACK_A_PHASES = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','CAMPUS_VOTE','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
+const TRACK_B_PHASES = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
 
 // Roles that can advance tickets through governance phases
-const MOVER_ROLES = ['admin','bylaws_chair','senate_manager','ec_member','provost_office'];
+const MOVER_ROLES = ['admin','bylaws_chair','faculty_senate_chair','senate_manager','provost_office'];
 // Roles that can create tickets
-const CREATOR_ROLES = ['admin','bylaws_chair','senate_manager','ec_member','unit_submitter'];
+const CREATOR_ROLES = ['admin','bylaws_chair','faculty_senate_chair','senate_manager','unit_submitter'];
 
 const VALID_TYPES = { university_amendment: TRACK_A_PHASES, unit_bylaws: TRACK_B_PHASES };
 function phasesFor(type) {

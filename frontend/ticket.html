@@ -108,6 +108,20 @@
               <input type="file" id="file-upload" multiple accept=".pdf,.docx,.doc,.txt,.png,.jpg" style="display:none;">
             </label>
           </div>
+
+          <!-- Staged upload: lets the uploader describe the files before sending -->
+          <div id="upload-stage" class="hidden" style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--panel);">
+            <div class="text-xs text-muted" style="margin-bottom:6px;">Selected files</div>
+            <div id="upload-filenames" style="font-size:0.85rem;margin-bottom:10px;"></div>
+            <textarea class="form-control" id="upload-desc" maxlength="500"
+              placeholder="Optional — describe what these files contain (e.g. redlined draft, committee memo)"
+              style="min-height:60px;font-size:0.85rem;"></textarea>
+            <div class="flex gap-2" style="margin-top:8px;">
+              <button class="btn btn-primary btn-sm" id="upload-confirm">Upload</button>
+              <button class="btn btn-secondary btn-sm" id="upload-cancel">Cancel</button>
+            </div>
+          </div>
+
           <div id="attachments-list"></div>
         </div>
 
@@ -143,8 +157,8 @@ document.getElementById('user-btn').addEventListener('click', () => document.get
 document.addEventListener('click', e => { if (!e.target.closest('.user-menu')) document.getElementById('user-dropdown').classList.remove('open'); });
 document.getElementById('logout-btn').addEventListener('click', () => { clearAuth(); window.location.href = 'login.html'; });
 
-const TRACK_A = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','GENERAL_COUNSEL','PROVOST_REVIEW','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
-const TRACK_B = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PROVOST_REVIEW','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
+const TRACK_A = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','CAMPUS_VOTE','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
+const TRACK_B = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
 
 const ticketId = new URLSearchParams(location.search).get('id');
 if (!ticketId) window.location.href = 'dashboard.html';
@@ -229,7 +243,7 @@ function render() {
   }).join('');
 
   // Phase actions (admin/chair/manager can advance)
-  const canAdvance = ['admin','bylaws_chair','senate_manager','ec_member','provost_office'].includes(user.role);
+  const canAdvance = ['admin','bylaws_chair','faculty_senate_chair','senate_manager','provost_office'].includes(user.role);
   const phaseActionsEl = document.getElementById('phase-actions');
   if (canAdvance && ticket.status !== 'published') {
     phaseActionsEl.innerHTML = `
@@ -294,6 +308,7 @@ function renderAttachments(attachments) {
           <div style="flex:1;min-width:0;">
             <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(a.original_name)}</div>
             <div class="text-xs text-muted">${(a.size/1024).toFixed(1)} KB · ${escHtml(a.uploaded_by_name||'')} · ${relativeTime(a.uploaded_at)}</div>
+            ${a.description ? `<div class="text-xs" style="margin-top:3px;color:var(--text);opacity:.8;white-space:normal;">${escHtml(a.description)}</div>` : ''}
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
             ${previewBtn}
@@ -524,21 +539,46 @@ async function toggleStuck() {
   }
 }
 
-// File upload
-document.getElementById('file-upload').addEventListener('change', async (e) => {
-  const files = e.target.files;
-  if (!files.length) return;
+// File upload — stage the selection so the uploader can add an optional note
+let _pendingFiles = null;
+const uploadStage = document.getElementById('upload-stage');
+
+document.getElementById('file-upload').addEventListener('change', (e) => {
+  if (!e.target.files.length) return;
+  _pendingFiles = e.target.files;
+  document.getElementById('upload-filenames').textContent =
+    Array.from(_pendingFiles).map(f => f.name).join(', ');
+  document.getElementById('upload-desc').value = '';
+  uploadStage.classList.remove('hidden');
+});
+
+function resetUploadStage() {
+  _pendingFiles = null;
+  uploadStage.classList.add('hidden');
+  document.getElementById('file-upload').value = '';
+}
+
+document.getElementById('upload-cancel').addEventListener('click', resetUploadStage);
+
+document.getElementById('upload-confirm').addEventListener('click', async () => {
+  if (!_pendingFiles) return;
+  const btn = document.getElementById('upload-confirm');
+  btn.disabled = true; btn.textContent = 'Uploading…';
   const fd = new FormData();
-  for (const f of files) fd.append('files', f);
+  for (const f of _pendingFiles) fd.append('files', f);
+  fd.append('description', document.getElementById('upload-desc').value.trim());
   try {
-    await fetch(`/BylawsTracker/api/tickets/${ticketId}/attachments`, {
+    const res = await fetch(`/BylawsTracker/api/tickets/${ticketId}/attachments`, {
       method: 'POST', headers: { Authorization: `Bearer ${getToken()}` }, body: fd
     });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Upload failed');
+    resetUploadStage();
     await load();
   } catch (err) {
-    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">Upload failed</div>`;
+    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Upload';
   }
-  e.target.value = '';
 });
 
 // Comments

@@ -72,7 +72,8 @@ db.exec(`
     mime_type TEXT,
     size INTEGER,
     uploaded_at TEXT NOT NULL DEFAULT (datetime('now')),
-    uploaded_by INTEGER REFERENCES users(id)
+    uploaded_by INTEGER REFERENCES users(id),
+    description TEXT
   );
 
   CREATE TABLE IF NOT EXISTS comments (
@@ -115,6 +116,11 @@ db.exec(`
 // Migrate existing DBs: add pw_version if missing
 try {
   db.exec("ALTER TABLE users ADD COLUMN pw_version INTEGER NOT NULL DEFAULT 1");
+} catch { /* column already exists */ }
+
+// Optional uploader note describing what each attachment contains
+try {
+  db.exec("ALTER TABLE ticket_attachments ADD COLUMN description TEXT");
 } catch { /* column already exists */ }
 
 // Prune expired SSE tokens periodically
