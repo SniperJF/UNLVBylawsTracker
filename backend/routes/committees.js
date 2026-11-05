@@ -21,7 +21,6 @@ const COMMITTEES = [
   { slug: 'curriculum',                  name: 'Undergraduate Curriculum',          group: 'Curriculum & Academic Policy' },
   { slug: 'athletic-council',            name: 'Intercollegiate Athletic Council',  group: 'Curriculum & Academic Policy' },
   { slug: 'academic-freedom',            name: 'Academic Freedom and Ethics',       group: 'University Governance' },
-  { slug: 'ai-shared-governance',        name: 'AI Shared Governance (Ad Hoc)',     group: 'University Governance' },
   { slug: 'campus',                      name: 'Campus and Fiscal Affairs',         group: 'University Governance' },
   { slug: 'diversity',                   name: 'Diversity, Equity and Inclusion',   group: 'University Governance' },
   { slug: 'university-bylaws',           name: 'University Bylaws',                 group: 'University Governance' },
@@ -50,38 +49,58 @@ function unescapeHtml(s) {
 
 // Placeholders that occupy the chair slot but are not a person.
 const NOT_A_PERSON = /^\s*(vacant|tbd|tba|n\/?a|none|pending\b.*|to be (determined|announced|elected))\s*$/i;
+const NAME_RE = /^[A-Z][A-Za-z.'()-]+(?: [A-Z(][A-Za-z.'()-]*){1,3}$/;
 
-// Committee pages use two different member layouts:
-//   <dt>ROLE</dt><dd><em>Name</em><br><a href="mailto:…"></dd>
-//   <h5>ROLE</h5><p><em>Name</em><br>Term expires …</p>
-// Match the chair's own block in either, so the wrong member's details are
-// never attributed to the chair.
+// Committee pages mark the chair three different ways, so all three are tried:
+//   <dt>COMMITTEE CHAIR …</dt><dd><em>Name</em><br><a href="mailto:…"></dd>
+//   <h5>COMMITTEE CHAIR …</h5><p><em>Name</em><br>Term expires …</p>
+//   <dt>College of Education</dt><dd><p>Name (Chair)<br><a href="mailto:…"></dd>
 function extractChair(doc) {
-  const isChairLabel = (raw) => {
-    const label = unescapeHtml(raw.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
-    if (/vice\s+chair/i.test(label)) return false;        // vice chair is a different person
-    return /\bCOMMITTEE\s+CHAIR\b/i.test(label) || /^CHAIR\b/i.test(label);
-  };
+  const blocks = [];
+  for (const m of doc.matchAll(/<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi)) {
+    blocks.push({ label: m[1], body: m[2] });
+  }
+  for (const m of doc.matchAll(/<h[2-6][^>]*>([\s\S]*?)<\/h[2-6]>([\s\S]*?)(?=<h[2-6][\s>]|$)/gi)) {
+    blocks.push({ label: m[1], body: m[2] });
+  }
 
-  const readBlock = (body) => {
+  const clean = (raw) => unescapeHtml(raw.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+
+  const readName = (body) => {
     const em = body.match(/<em[^>]*>([\s\S]*?)<\/em>/i);
-    let name = em ? unescapeHtml(em[1].replace(/<[^>]+>/g, '')).trim() : null;
+    let name = em ? clean(em[1]) : null;
     if (!name) {
       const lines = unescapeHtml(body.replace(/<[^>]+>/g, '\n')).split('\n').map(s => s.trim());
-      name = lines.find(l => /^[A-Z][A-Za-z.'()-]+(?: [A-Z][A-Za-z.'()-]+){1,3}$/.test(l)) || null;
+      name = lines.find(l => NAME_RE.test(l) && !/^term expires/i.test(l)) || null;
     }
-    if (name && NOT_A_PERSON.test(name)) name = null;
-    const mail = body.match(/mailto:([^"'>?]+)/i);
-    return { chair: name, chairEmail: name && mail ? unescapeHtml(mail[1]).trim() : null };
+    if (!name) return null;
+    name = name.replace(/\s*\((?:co-)?chair\)\s*/i, '').trim();
+    return (!name || NOT_A_PERSON.test(name)) ? null : name;
   };
 
-  for (const m of doc.matchAll(/<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi)) {
-    if (isChairLabel(m[1])) return readBlock(m[2]);
+  const emailOf = (body) => {
+    const m = body.match(/mailto:([^"'>?]+)/i);
+    return m ? unescapeHtml(m[1]).trim() : null;
+  };
+
+  // Labelled chair seats. Keep scanning past vacant ones: some committees list
+  // several chair-labelled seats and only a later one is filled.
+  for (const b of blocks) {
+    const label = clean(b.label);
+    if (/vice\s+chair/i.test(label)) continue;
+    if (!(/\bCOMMITTEE\s+CHAIR\b/i.test(label) || /^CHAIR\b/i.test(label))) continue;
+    const name = readName(b.body);
+    if (name) return { chair: name, chairEmail: emailOf(b.body) };
   }
-  // Heading layout: take only up to the next heading so we stop at the next member.
-  for (const m of doc.matchAll(/<h[2-6][^>]*>([\s\S]*?)<\/h[2-6]>([\s\S]*?)(?=<h[2-6][\s>]|$)/gi)) {
-    if (isChairLabel(m[1])) return readBlock(m[2]);
+
+  // Chair flagged inside the member's own line instead of the seat label.
+  for (const b of blocks) {
+    const txt = clean(b.body);
+    if (!/\((?:co-)?chair\)/i.test(txt) || /vice\s+chair/i.test(txt)) continue;
+    const name = readName(b.body);
+    if (name) return { chair: name, chairEmail: emailOf(b.body) };
   }
+
   return { chair: null, chairEmail: null };
 }
 
