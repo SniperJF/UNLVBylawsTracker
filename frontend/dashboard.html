@@ -131,8 +131,8 @@
 requireLogin();
 renderNav('dashboard');
 
-const TRACK_A = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','CAMPUS_VOTE','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
-const TRACK_B = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
+const TRACK_A = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','CAMPUS_VOTE','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISH_TO_WEBSITE','COMPLETE'];
+const TRACK_B = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISH_TO_WEBSITE','COMPLETE'];
 
 let allTickets = [];
 
@@ -240,7 +240,8 @@ const PHASE_ICONS = {
   GENERAL_COUNSEL:   { key:'counsel',   desc:'University legal counsel reviews language and compliance' },
   PRESIDENT_REVIEW:  { key:'president', desc:'President signs — 20 day mandatory review period begins' },
   CHANCELLOR_REVIEW: { key:'chancellor',desc:'NSHE Chancellor signs — final system-level approval' },
-  PUBLISHED:         { key:'provost',   desc:'Provost office published the amendment on the website' },
+  PUBLISH_TO_WEBSITE:{ key:'provost',   desc:'Waiting on the Provost office to post the amendment to the website' },
+  COMPLETE:          { key:'published', desc:'Amendment is live on the website and the record is closed' },
   UNIT_DRAFTING:     { key:'committee', desc:'Academic unit drafts revised unit bylaws language' },
   SUBMITTED_OFA:     { key:'ec',        desc:'Draft submitted to the Office of Faculty Affairs' },
   OFA_REVIEW:        { key:'agenda',    desc:'OFA reviews for consistency with governance policy' },

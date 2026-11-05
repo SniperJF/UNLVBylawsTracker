@@ -157,8 +157,8 @@ document.getElementById('user-btn').addEventListener('click', () => document.get
 document.addEventListener('click', e => { if (!e.target.closest('.user-menu')) document.getElementById('user-dropdown').classList.remove('open'); });
 document.getElementById('logout-btn').addEventListener('click', () => { clearAuth(); window.location.href = 'login.html'; });
 
-const TRACK_A = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','CAMPUS_VOTE','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
-const TRACK_B = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
+const TRACK_A = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','CAMPUS_VOTE','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISH_TO_WEBSITE','COMPLETE'];
+const TRACK_B = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISH_TO_WEBSITE','COMPLETE'];
 
 const ticketId = new URLSearchParams(location.search).get('id');
 if (!ticketId) window.location.href = 'dashboard.html';

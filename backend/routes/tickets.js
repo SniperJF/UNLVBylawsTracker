@@ -6,8 +6,8 @@ const { logAudit } = require('../middleware/audit');
 const router = express.Router();
 router.use(requireAuth);
 
-const TRACK_A_PHASES = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','CAMPUS_VOTE','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
-const TRACK_B_PHASES = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISHED'];
+const TRACK_A_PHASES = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','CAMPUS_VOTE','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISH_TO_WEBSITE','COMPLETE'];
+const TRACK_B_PHASES = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISH_TO_WEBSITE','COMPLETE'];
 
 // Roles that can advance tickets through governance phases
 const MOVER_ROLES = ['admin','bylaws_chair','faculty_senate_chair','senate_manager','provost_office'];
@@ -151,7 +151,7 @@ router.post('/:id/advance', requireRole(...MOVER_ROLES), (req, res) => {
   db.prepare('UPDATE ticket_phase_history SET exited_at = ? WHERE ticket_id = ? AND phase = ? AND exited_at IS NULL').run(now, ticket.id, ticket.current_phase);
   db.prepare('INSERT INTO ticket_phase_history (ticket_id, phase, entered_by) VALUES (?, ?, ?)').run(ticket.id, next_phase, req.user.id);
 
-  const newStatus = next_phase === 'PUBLISHED' ? 'published' : 'active';
+  const newStatus = next_phase === 'COMPLETE' ? 'published' : 'active';
   db.prepare('UPDATE tickets SET current_phase = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(next_phase, newStatus, ticket.id);
 
   if (ticket.originator_id) {
@@ -193,7 +193,7 @@ router.post('/:id/phase', requireRole('admin','bylaws_chair','senate_manager'), 
   db.prepare('UPDATE ticket_phase_history SET exited_at = ? WHERE ticket_id = ? AND phase = ? AND exited_at IS NULL').run(now, ticket.id, ticket.current_phase);
   db.prepare('INSERT INTO ticket_phase_history (ticket_id, phase, entered_by) VALUES (?, ?, ?)').run(ticket.id, phase, req.user.id);
 
-  const newStatus = phase === 'PUBLISHED' ? 'published' : ticket.status === 'published' ? 'active' : ticket.status;
+  const newStatus = phase === 'COMPLETE' ? 'published' : ticket.status === 'published' ? 'active' : ticket.status;
   db.prepare('UPDATE tickets SET current_phase = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(phase, newStatus, ticket.id);
   logAudit(req.user.id, req.user.name, 'ticket.phase_set', 'ticket', ticket.id, { phase }, req.ip);
   res.json({ message: 'Phase set', new_phase: phase });

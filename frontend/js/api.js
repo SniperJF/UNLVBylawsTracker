@@ -102,8 +102,10 @@ function formatDate(dateStr) {
 
 function statusBadge(status, phase) {
   if (status === 'stuck') return '<span class="phase-badge phase-stuck">STUCK</span>';
-  if (status === 'published') return '<span class="phase-badge phase-published">PUBLISHED</span>';
-  const waitPhases = ['PRESIDENT_REVIEW','CHANCELLOR_REVIEW','GENERAL_COUNSEL','OFA_REVIEW'];
+  if (status === 'published') return `<span class="phase-badge phase-published">${(phase || 'COMPLETE').replace(/_/g,' ')}</span>`;
+  // PUBLISH_TO_WEBSITE is a wait state — the ticket is approved but sitting with
+  // the Provost office until it actually goes live.
+  const waitPhases = ['PRESIDENT_REVIEW','CHANCELLOR_REVIEW','GENERAL_COUNSEL','OFA_REVIEW','PUBLISH_TO_WEBSITE'];
   if (waitPhases.includes(phase)) return `<span class="phase-badge phase-waiting">${phase.replace(/_/g,' ')}</span>`;
   return `<span class="phase-badge phase-active">${phase.replace(/_/g,' ')}</span>`;
 }
