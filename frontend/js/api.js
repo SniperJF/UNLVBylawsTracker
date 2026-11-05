@@ -145,6 +145,9 @@ function renderNav(activePage) {
   // Open SSE connection using a short-lived one-time token (not the JWT)
   // so the long-lived JWT never appears in nginx access logs
   connectSSE();
+
+  // Site-wide page-aware assistant bubble (js/padme.js)
+  if (typeof initPadme === 'function') initPadme();
 }
 
 async function connectSSE() {
