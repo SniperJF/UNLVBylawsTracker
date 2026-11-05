@@ -43,11 +43,53 @@ function stripHtml(h) {
   return h.replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
 }
 
+function unescapeHtml(s) {
+  return s.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+}
+
+// Placeholders that occupy the chair slot but are not a person.
+const NOT_A_PERSON = /^\s*(vacant|tbd|tba|n\/?a|none|pending\b.*|to be (determined|announced|elected))\s*$/i;
+
+// Committee pages use two different member layouts:
+//   <dt>ROLE</dt><dd><em>Name</em><br><a href="mailto:…"></dd>
+//   <h5>ROLE</h5><p><em>Name</em><br>Term expires …</p>
+// Match the chair's own block in either, so the wrong member's details are
+// never attributed to the chair.
+function extractChair(doc) {
+  const isChairLabel = (raw) => {
+    const label = unescapeHtml(raw.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+    if (/vice\s+chair/i.test(label)) return false;        // vice chair is a different person
+    return /\bCOMMITTEE\s+CHAIR\b/i.test(label) || /^CHAIR\b/i.test(label);
+  };
+
+  const readBlock = (body) => {
+    const em = body.match(/<em[^>]*>([\s\S]*?)<\/em>/i);
+    let name = em ? unescapeHtml(em[1].replace(/<[^>]+>/g, '')).trim() : null;
+    if (!name) {
+      const lines = unescapeHtml(body.replace(/<[^>]+>/g, '\n')).split('\n').map(s => s.trim());
+      name = lines.find(l => /^[A-Z][A-Za-z.'()-]+(?: [A-Z][A-Za-z.'()-]+){1,3}$/.test(l)) || null;
+    }
+    if (name && NOT_A_PERSON.test(name)) name = null;
+    const mail = body.match(/mailto:([^"'>?]+)/i);
+    return { chair: name, chairEmail: name && mail ? unescapeHtml(mail[1]).trim() : null };
+  };
+
+  for (const m of doc.matchAll(/<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi)) {
+    if (isChairLabel(m[1])) return readBlock(m[2]);
+  }
+  // Heading layout: take only up to the next heading so we stop at the next member.
+  for (const m of doc.matchAll(/<h[2-6][^>]*>([\s\S]*?)<\/h[2-6]>([\s\S]*?)(?=<h[2-6][\s>]|$)/gi)) {
+    if (isChairLabel(m[1])) return readBlock(m[2]);
+  }
+  return { chair: null, chairEmail: null };
+}
+
 async function scrape(slug) {
   const hit = cache.get(slug);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit;
 
-  const rec = { at: Date.now(), charge: null, chair: null };
+  const rec = { at: Date.now(), charge: null, chair: null, chairEmail: null };
   try {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 20000);
@@ -57,19 +99,13 @@ async function scrape(slug) {
     });
     clearTimeout(t);
     if (res.ok) {
-      const lines = stripHtml(await res.text()).split('\n').map(s => s.trim()).filter(Boolean);
+      const doc = await res.text();
+      const lines = stripHtml(doc).split('\n').map(s => s.trim()).filter(Boolean);
       for (const l of lines) {
         if (l.length > 70 && /responsib|shall|review|committee/i.test(l)
             && !/cookie|navigation|skip to|copyright/i.test(l)) { rec.charge = l.slice(0, 400); break; }
       }
-      for (let i = 0; i < lines.length; i++) {
-        if (/\bCOMMITTEE CHAIR\b/i.test(lines[i])) {
-          for (const cand of lines.slice(i + 1, i + 4)) {
-            if (/^[A-Z][A-Za-z.'-]+(?: [A-Z][A-Za-z.'-]+){1,3}$/.test(cand)) { rec.chair = cand; break; }
-          }
-          if (rec.chair) break;
-        }
-      }
+      Object.assign(rec, extractChair(doc));
     }
   } catch { /* leave nulls; the UI shows the link so the user can check directly */ }
 
@@ -84,6 +120,7 @@ async function allCommittees() {
     url: BASE + c.slug,
     charge: details[i].charge,
     chair: details[i].chair,
+    chairEmail: details[i].chairEmail,
   }));
 }
 
@@ -102,7 +139,7 @@ router.get('/:slug', async (req, res) => {
   if (!c) return res.status(404).json({ error: 'Unknown committee' });
   if (req.query.fresh) cache.delete(c.slug);
   const d = await scrape(c.slug);
-  res.json({ ...c, url: BASE + c.slug, charge: d.charge, chair: d.chair });
+  res.json({ ...c, url: BASE + c.slug, charge: d.charge, chair: d.chair, chairEmail: d.chairEmail });
 });
 
 const askLimiter = rateLimit({
@@ -122,7 +159,7 @@ router.post('/ask', askLimiter, async (req, res) => {
 
   const list = await allCommittees();
   const directory = list.map(c =>
-    `- ${c.name} [slug: ${c.slug}] (${c.group})\n  Chair: ${c.chair || 'not listed'}\n  Charge: ${c.charge || 'not published'}`
+    `- ${c.name} [slug: ${c.slug}] (${c.group})\n  Chair: ${c.chair || 'not listed'}${c.chairEmail ? ` <${c.chairEmail}>` : ''}\n  Charge: ${c.charge || 'not published'}`
   ).join('\n');
 
   const system = `You are Padmé, the guide dog of the UNLV Faculty Senate Bylaws Tracker. Right now you are helping someone find the RIGHT FACULTY SENATE COMMITTEE for their question.
