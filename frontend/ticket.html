@@ -26,6 +26,10 @@
 .attach-preview-pane iframe { display: block; width: 100%; height: 520px; border: none; }
 .attach-preview-pane img { display: block; max-width: 100%; max-height: 480px; margin: 0 auto; }
 .attach-preview-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: var(--muted); background: var(--panel); }
+.pdf-scroll { max-height: 520px; overflow-y: auto; background: var(--panel); padding: 10px; }
+.pdf-page { display: block; width: 100%; height: auto; margin: 0 auto 10px; background: #fff; border: 1px solid var(--border); border-radius: 3px; }
+.pdf-page:last-of-type { margin-bottom: 0; }
+.pdf-more { text-align: center; font-size: 0.76rem; color: var(--muted); padding: 10px 6px 4px; }
 .btn-preview { background: none; border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: border-color .15s, color .15s; white-space: nowrap; font-family: var(--font); }
 .btn-preview:hover, .btn-preview.active { border-color: var(--scarlet); color: var(--scarlet); }
 .btn-preview svg { flex-shrink: 0; }
@@ -418,14 +422,41 @@ async function togglePreview(attachmentId, mimeType, originalName) {
     if (loading) loading.remove();
 
     if (isPdf) {
-      const url = URL.createObjectURL(blob);
-      _blobUrls[attachmentId] = url;
-      // <embed> works more reliably than <iframe> for blob: PDFs in Firefox
-      const embed = document.createElement('embed');
-      embed.src = url;
-      embed.type = 'application/pdf';
-      embed.style.cssText = 'width:100%;height:520px;border:none;display:block;';
-      pane.appendChild(embed);
+      // Rendered with PDF.js rather than <embed src="blob:">: WebKit refuses to
+      // display PDFs from blob URLs inline, so Safari showed an empty pane while
+      // Firefox was fine. Drawing to canvas from the ArrayBuffer avoids URLs.
+      await _loadScript('js/pdf.min.js');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
+      const pdf = await pdfjsLib.getDocument({ data: await blob.arrayBuffer() }).promise;
+      _blobUrls[attachmentId] = 'rendered';
+
+      const scroller = document.createElement('div');
+      scroller.className = 'pdf-scroll';
+      pane.appendChild(scroller);
+
+      const MAX_PAGES = 15;
+      const shown = Math.min(pdf.numPages, MAX_PAGES);
+      for (let n = 1; n <= shown; n++) {
+        const page = await pdf.getPage(n);
+        const base = page.getViewport({ scale: 1 });
+        // Fit the pane width, then multiply by DPR so text stays sharp.
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const scale = ((scroller.clientWidth || 520) / base.width) * dpr;
+        const vp = page.getViewport({ scale });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = vp.width;
+        canvas.height = vp.height;
+        canvas.className = 'pdf-page';
+        scroller.appendChild(canvas);
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+      }
+      if (pdf.numPages > shown) {
+        const more = document.createElement('div');
+        more.className = 'pdf-more';
+        more.textContent = `Showing first ${shown} of ${pdf.numPages} pages — download for the rest.`;
+        scroller.appendChild(more);
+      }
 
     } else if (isImage) {
       const url = URL.createObjectURL(blob);
