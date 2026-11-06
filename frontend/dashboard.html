@@ -226,7 +226,9 @@ const PHASE_DEADLINES = { PRESIDENT_REVIEW: 20, CHANCELLOR_REVIEW: 45 };
 function deadlineBadge(t) {
   const days = PHASE_DEADLINES[t.current_phase];
   if (!days || !t.current_phase_entered_at) return '';
-  const enteredMs = new Date(t.current_phase_entered_at).getTime();
+  const entered = parseTs(t.current_phase_entered_at);
+  if (!entered) return "";
+  const enteredMs = entered.getTime();
   const daysLeft = Math.ceil((enteredMs + days * 86400000 - Date.now()) / 86400000);
   const color = daysLeft > 7 ? '#22c55e' : daysLeft > 3 ? '#f59e0b' : '#ef4444';
   const label = daysLeft >= 0 ? `${daysLeft} Days left of ${days}` : `OVERDUE ${-daysLeft} Days`;

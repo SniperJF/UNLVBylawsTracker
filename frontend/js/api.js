@@ -82,9 +82,23 @@ function requireAdmin() {
   }
 }
 
+// SQLite writes datetime('now') as "YYYY-MM-DD HH:MM:SS" in UTC with no zone
+// marker. JS parses that space-separated form as *local* time, which put every
+// timestamp hours out. Pin it to UTC; ISO strings already carrying a zone pass
+// through untouched.
+function parseTs(dateStr) {
+  if (!dateStr) return null;
+  const s = String(dateStr).trim();
+  const d = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(s)
+    ? new Date(s.replace(' ', 'T') + 'Z')
+    : new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function relativeTime(dateStr) {
-  if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
+  const d = parseTs(dateStr);
+  if (!d) return '';
+  const diff = Date.now() - d.getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m ago`;
@@ -92,12 +106,23 @@ function relativeTime(dateStr) {
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString();
+  return d.toLocaleDateString();
+}
+
+// Absolute local date + time, e.g. "Nov 6, 2026, 1:56 PM"
+function formatDateTime(dateStr) {
+  const d = parseTs(dateStr);
+  if (!d) return '';
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
 }
 
 function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const d = parseTs(dateStr);
+  if (!d) return '—';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function statusBadge(status, phase) {
