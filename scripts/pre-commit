@@ -1,0 +1,26 @@
+#!/bin/sh
+# Re-stamp frontend asset URLs before every commit, so a js/css change can
+# never ship with HTML pointing at the old cached filename.
+# Install with: scripts/install-hooks.sh
+
+repo="$(git rev-parse --show-toplevel)"
+[ -f "$repo/scripts/stamp-assets.py" ] || exit 0
+
+python3 "$repo/scripts/stamp-assets.py" >/dev/null || {
+  echo "pre-commit: stamp-assets.py failed" >&2
+  exit 1
+}
+
+# Only re-stage HTML that was already staged, so the hook never pulls unrelated
+# work-in-progress into the commit.
+staged_html="$(git diff --cached --name-only --diff-filter=ACM | grep -E '^frontend/.*\.html$' || true)"
+restamped=""
+for f in $staged_html; do
+  if ! git diff --quiet -- "$f"; then
+    git add "$f"
+    restamped="$restamped $f"
+  fi
+done
+
+[ -n "$restamped" ] && echo "pre-commit: refreshed asset stamps in:$restamped"
+exit 0
