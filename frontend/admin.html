@@ -65,6 +65,7 @@
     <button class="tab" data-tab="users">All Users</button>
     <button class="tab" data-tab="audit">Audit Log</button>
     <button class="tab" data-tab="backup">Backup</button>
+    <button class="tab" data-tab="digest">Email Digest</button>
   </div>
 
   <!-- Pending Requests -->
@@ -120,6 +121,25 @@
       </div>
     </div>
   </div>
+
+  <!-- Email digest -->
+  <div class="tab-panel" id="tab-digest">
+    <div class="card" style="margin-bottom:16px;">
+      <div style="font-weight:700;margin-bottom:6px;">Daily digest</div>
+      <div class="text-sm text-muted" id="digest-when">Loading…</div>
+      <div class="flex gap-2" style="margin-top:14px;align-items:center;flex-wrap:wrap;">
+        <input type="email" class="form-control" id="test-to" placeholder="Send a test to…" style="max-width:280px;">
+        <button class="btn btn-primary btn-sm" id="send-test">Send test now</button>
+        <span id="test-status" class="text-sm"></span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Receives digest</th></tr></thead>
+        <tbody id="digest-body"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- Reset password modal -->
@@ -158,6 +178,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
     if (tab.dataset.tab === 'users') loadUsers();
     if (tab.dataset.tab === 'audit') loadAudit();
+    if (tab.dataset.tab === 'digest') loadDigest();
   });
 });
 
@@ -425,6 +446,61 @@ document.getElementById('dl-zip').addEventListener('click', async () => {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   } catch (err) { showAlert(err.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Download Attachments (.zip)'; }
+});
+
+// ── Email digest ──────────────────────────────────────────────────────────
+async function loadDigest() {
+  try {
+    const d = await apiFetch('/admin/digest');
+    const h = String(d.sendHourUtc).padStart(2, '0');
+    const last = d.lastRuns[0];
+    document.getElementById('digest-when').innerHTML =
+      `Sends automatically at <strong>${h}:00 UTC</strong> daily. ` +
+      (last ? `Last run ${escHtml(last.day)} to ${last.recipients} recipient(s).`
+            : 'Has not run yet.');
+
+    document.getElementById('digest-body').innerHTML = d.users.map(u => `
+      <tr>
+        <td><strong>${escHtml(u.name)}</strong></td>
+        <td class="text-sm">${escHtml(u.email)}</td>
+        <td class="text-sm">${escHtml(u.role.replace(/_/g, ' '))}</td>
+        <td>
+          ${u.eligible ? `<button class="btn btn-sm ${u.subscribed ? 'btn-secondary' : 'btn-primary'} digest-btn"
+             data-uid="${u.id}" data-on="${u.subscribed ? 1 : 0}">${u.subscribed ? 'On' : 'Off'}</button>
+             ${!u.explicit ? '<span class="text-xs text-muted" style="margin-left:6px;">default</span>' : ''}`
+           : '<span class="text-xs text-muted">not approved / unverified</span>'}
+        </td>
+      </tr>`).join('');
+
+    document.querySelectorAll('.digest-btn').forEach(b => {
+      b.addEventListener('click', async () => {
+        b.disabled = true;
+        try {
+          await apiFetch(`/admin/digest/${b.dataset.uid}`, {
+            method: 'PATCH', body: JSON.stringify({ subscribed: b.dataset.on !== '1' }),
+          });
+          loadDigest();
+        } catch (err) { showAlert(err.message, 'error'); b.disabled = false; }
+      });
+    });
+  } catch (err) {
+    document.getElementById('digest-when').textContent = err.message;
+  }
+}
+
+document.getElementById('send-test').addEventListener('click', async () => {
+  const btn = document.getElementById('send-test');
+  const out = document.getElementById('test-status');
+  const to = document.getElementById('test-to').value.trim();
+  btn.disabled = true; btn.textContent = 'Sending…'; out.textContent = '';
+  try {
+    const r = await apiFetch('/admin/digest/test', {
+      method: 'POST', body: JSON.stringify(to ? { email: to } : {}),
+    });
+    out.innerHTML = `<span style="color:var(--success,#22c55e);">Sent to ${escHtml(r.to)}</span>`;
+  } catch (err) {
+    out.innerHTML = `<span style="color:var(--danger,#ef4444);">${escHtml(err.message)}</span>`;
+  } finally { btn.disabled = false; btn.textContent = 'Send test now'; }
 });
 
 loadRequests();

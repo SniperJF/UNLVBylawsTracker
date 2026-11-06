@@ -91,4 +91,59 @@ router.get('/backup/zip', (req, res) => {
   archive.finalize();
 });
 
+// ── Daily digest administration ────────────────────────────────────────────
+const { runDigest, wantsDigest } = require('../digest');
+const { logAudit } = require('../middleware/audit');
+
+// GET /api/admin/digest — who currently receives the digest, and when it last ran
+router.get('/digest', (req, res) => {
+  const users = db.prepare(
+    `SELECT id, name, email, role, approved, email_verified, digest_optin
+     FROM users ORDER BY name`
+  ).all();
+  res.json({
+    sendHourUtc: Number(process.env.DIGEST_HOUR_UTC ?? 16),
+    lastRuns: db.prepare('SELECT day, sent_at, recipients FROM digest_runs ORDER BY day DESC LIMIT 7').all(),
+    users: users.map(u => ({
+      id: u.id, name: u.name, email: u.email, role: u.role,
+      eligible: !!(u.approved && u.email_verified),
+      subscribed: wantsDigest(u),
+      explicit: u.digest_optin !== null && u.digest_optin !== undefined,
+    })),
+  });
+});
+
+// PATCH /api/admin/digest/:id — turn the digest on or off for someone
+router.patch('/digest/:id', (req, res) => {
+  const on = req.body?.subscribed;
+  if (typeof on !== 'boolean') return res.status(400).json({ error: 'subscribed must be true or false' });
+  const target = db.prepare('SELECT id, email FROM users WHERE id = ?').get(req.params.id);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+
+  db.prepare('UPDATE users SET digest_optin = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run(on ? 1 : 0, target.id);
+  logAudit(req.user.id, req.user.name, 'digest.optin', 'user', target.id,
+    { email: target.email, subscribed: on, by: 'admin' }, req.ip);
+  res.json({ subscribed: on });
+});
+
+// POST /api/admin/digest/test — send one digest now, to a single address
+router.post('/digest/test', async (req, res) => {
+  const to = String(req.body?.email || req.user.email).trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return res.status(400).json({ error: 'Invalid email' });
+  if (!db.prepare('SELECT 1 FROM users WHERE email = ?').get(to)) {
+    return res.status(400).json({ error: 'That address does not belong to a user of this system' });
+  }
+  try {
+    // force: send even if today's digest already went out or there is no news.
+    const r = await runDigest({ force: true, only: to });
+    logAudit(req.user.id, req.user.name, 'digest.test', 'user', null, { to, sent: r.sent }, req.ip);
+    if (!r.sent) return res.status(502).json({ error: r.failed?.[0]?.error || 'Send failed' });
+    res.json({ sent: r.sent, to });
+  } catch (e) {
+    console.error('[digest/test]', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
+
 module.exports = router;

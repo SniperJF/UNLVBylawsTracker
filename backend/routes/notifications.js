@@ -1,7 +1,9 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { wantsDigest } = require('../digest');
+const { logAudit } = require('../middleware/audit');
+const { requireAuth, ADMIN_ROLES } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -103,6 +105,26 @@ router.post('/mark-all-read', (req, res) => {
 router.delete('/', (req, res) => {
   db.prepare('DELETE FROM notifications WHERE user_id = ?').run(req.user.id);
   res.json({ message: 'Cleared' });
+});
+
+// GET /api/notifications/digest — my own digest subscription state
+router.get('/digest', (req, res) => {
+  const u = db.prepare('SELECT role, digest_optin FROM users WHERE id = ?').get(req.user.id);
+  res.json({
+    subscribed: wantsDigest(u),
+    explicit: u.digest_optin !== null && u.digest_optin !== undefined,
+    defaultOn: ADMIN_ROLES.includes(u.role),
+  });
+});
+
+// PATCH /api/notifications/digest — subscribe or unsubscribe myself
+router.patch('/digest', (req, res) => {
+  const on = req.body?.subscribed;
+  if (typeof on !== 'boolean') return res.status(400).json({ error: 'subscribed must be true or false' });
+  db.prepare('UPDATE users SET digest_optin = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run(on ? 1 : 0, req.user.id);
+  logAudit(req.user.id, req.user.name, 'digest.optin', 'user', req.user.id, { subscribed: on }, req.ip);
+  res.json({ subscribed: on });
 });
 
 module.exports = router;

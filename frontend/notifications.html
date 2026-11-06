@@ -57,6 +57,14 @@
       </div>
     </div>
 
+    <div class="card mb-4" id="digest-card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+      <div>
+        <div style="font-weight:700;margin-bottom:3px;">Daily email digest</div>
+        <div class="text-sm text-muted" id="digest-desc">One email a day with deadlines, phase changes and new comments.</div>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="digest-toggle" disabled>Loading…</button>
+    </div>
+
     <div class="card" style="padding:0;overflow:hidden;" id="notif-container">
       <div style="text-align:center;padding:40px;"><div class="spinner" style="margin:auto;"></div></div>
     </div>
@@ -133,6 +141,41 @@ document.getElementById('clear-all').addEventListener('click', async () => {
 });
 
 
+// ── Daily email digest subscription ──────────────────────────────────────
+let digestOn = null;
+
+function paintDigest(d) {
+  digestOn = d.subscribed;
+  const btn = document.getElementById('digest-toggle');
+  btn.disabled = false;
+  btn.textContent = d.subscribed ? 'Unsubscribe' : 'Subscribe';
+  btn.className = 'btn btn-sm ' + (d.subscribed ? 'btn-secondary' : 'btn-primary');
+  document.getElementById('digest-desc').innerHTML = d.subscribed
+    ? 'You receive one email a day with deadlines, phase changes and new comments.'
+      + (d.defaultOn && !d.explicit ? ' <span class="text-muted">(on by default for your role)</span>' : '')
+    : 'One email a day with deadlines, phase changes and new comments. You are not subscribed.';
+}
+
+async function loadDigest() {
+  try { paintDigest(await apiFetch('/notifications/digest')); }
+  catch { document.getElementById('digest-card').style.display = 'none'; }
+}
+
+document.getElementById('digest-toggle').addEventListener('click', async () => {
+  const btn = document.getElementById('digest-toggle');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const r = await apiFetch('/notifications/digest', {
+      method: 'PATCH', body: JSON.stringify({ subscribed: !digestOn }),
+    });
+    paintDigest({ subscribed: r.subscribed, explicit: true, defaultOn: false });
+  } catch (err) {
+    btn.disabled = false;
+    document.getElementById('digest-desc').textContent = err.message;
+  }
+});
+
+loadDigest();
 loadNotifications();
 </script>
 <footer class="site-footer">Built by <a href="https://jorge-fonseca.com" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;"><strong>FRG</strong></a> &nbsp;·&nbsp; UNLV Faculty Senate Bylaws Tracker</footer>

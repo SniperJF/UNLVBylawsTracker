@@ -123,6 +123,22 @@ try {
   db.exec("ALTER TABLE ticket_attachments ADD COLUMN description TEXT");
 } catch { /* column already exists */ }
 
+// Daily digest opt-in. NULL means "follow the role default" (admins in,
+// everyone else out), so promoting someone to admin subscribes them without a
+// backfill, while an explicit 0 or 1 always wins.
+try {
+  db.exec("ALTER TABLE users ADD COLUMN digest_optin INTEGER DEFAULT NULL");
+} catch { /* column already exists */ }
+
+// One row per calendar day the digest was sent, so a restart cannot re-send.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS digest_runs (
+    day TEXT PRIMARY KEY,
+    sent_at TEXT NOT NULL DEFAULT (datetime('now')),
+    recipients INTEGER NOT NULL DEFAULT 0
+  );
+`);
+
 // Prune expired SSE tokens periodically
 setInterval(() => {
   try { db.prepare('DELETE FROM sse_tokens WHERE expires_at < ?').run(Date.now()); } catch {}

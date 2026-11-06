@@ -47,6 +47,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/committees', committeeRoutes);
 
+// Daily digest scheduler (opt-in per user; see backend/digest.js)
+require('./digest').startScheduler();
+
 // Serve uploaded files (auth required — files are outside web root)
 const { uploadsDir } = require('./middleware/upload');
 const { requireAuth } = require('./middleware/auth');
