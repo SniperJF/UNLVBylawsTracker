@@ -105,7 +105,7 @@
   const MAX_ITEMS = 90, MAX_ROWS = 25, MAX_LABEL = 70;
 
   // Never click anything whose label suggests it changes or destroys state.
-  const UNSAFE = /\b(save|submit|delete|remove|approve|reject|assign|release|done|confirm|edit|update|add|create|upload|import|export|download|sync|run|start|stop|clear|reset|log ?out|sign ?out|send|mark|archive|restore|apply|accept|decline|verify|retry|advance|stuck|publish|post|resolve|deny|grant)\b/i;
+  const UNSAFE = /\b(save|submit|delete|remove|approve|reject|assign|release|done|confirm|edit|update|add|create|upload|import|export|download|sync|run|start|stop|clear|reset|log ?out|sign ?out|send|mark|archive|restore|apply|accept|decline|verify|retry|advance|stuck|hold|publish|post|resolve|deny|grant)\b/i;
   const ACTION_WORDS = /\b(sort|order|open|go|take me|bring me|navigate|click|press|tap|switch|filter|search|find|look up|type|enter|select|expand|collapse|next|previous|tab|show me the)\b/i;
   // Admin is user management and backups; never act there.
   const NO_ACT_PAGES = /^(admin|login|profile)\.html$/;

@@ -174,7 +174,9 @@ router.post('/:id/stuck', requireRole(...MOVER_ROLES), (req, res) => {
   db.prepare('UPDATE tickets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newStatus, ticket.id);
 
   if (ticket.originator_id) {
-    createNotification(ticket.originator_id, 'stuck_change', `"${ticket.title}" marked ${newStatus}`, ticket.id);
+    // Status value stays 'stuck' internally; the wording users see is "on hold".
+    const phrase = newStatus === 'stuck' ? 'put on hold' : 'taken off hold';
+    createNotification(ticket.originator_id, 'stuck_change', `"${ticket.title}" was ${phrase}`, ticket.id);
   }
   logAudit(req.user.id, req.user.name, 'ticket.stuck', 'ticket', ticket.id, { status: newStatus }, req.ip);
   res.json({ message: 'Updated', status: newStatus });

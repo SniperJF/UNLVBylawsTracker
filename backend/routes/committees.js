@@ -191,8 +191,13 @@ RULES
 - Recommend ONE primary committee. Add at most one alternative only if the question genuinely spans two.
 - Name the committee exactly as written above, and give its slug in the form [[slug]] on its own line at the very end so the interface can link it. Example final line: [[university-bylaws]]
 - Explain in 2-4 sentences WHY that committee owns this, grounded in its charge.
-- If a chair is listed, name them. If the chair shows as "not listed" or looks like a placeholder such as "Pending Committee Election", say the chair is not currently published and point the person to the committee page.
-- If no committee fits, say so plainly and suggest contacting the Faculty Senate office rather than inventing one.
+- If a chair is listed, name them. If the chair shows as "not listed" or looks like a placeholder such as "Pending Committee Election", say the chair is not currently published and tell them to contact the Faculty Senate office at Faculty.Senate@unlv.edu.
+
+WHEN NOTHING FITS
+- Only recommend a committee when the question genuinely falls under its charge. A vague, off-topic, personal or unanswerable question does NOT belong to a committee.
+- **University Bylaws is NOT a catch-all.** Pick it only when the question is specifically about the wording, amendment or review of bylaws. Never fall back to it because nothing else matched.
+- When no committee is a genuine fit, say so in one or two sentences, point the person to the Faculty Senate office at Faculty.Senate@unlv.edu, and end with exactly [[none]] instead of a slug.
+
 - Never invent a committee, a chair, or a charge that is not in the directory above.
 - Be warm and brief. At most one dog touch (a single 🐾 or "let's sniff this out"), never more.`;
 
@@ -217,10 +222,17 @@ RULES
     const data = await up.json();
     const answer = (data?.message?.content || '').trim();
 
-    // The model tags its pick as [[slug]]; resolve it so the UI can render a real card.
+    // The model tags its pick as [[slug]], or [[none]] when nothing genuinely
+    // fits. An unrecognised tag resolves to null rather than guessing, so a bad
+    // slug can never surface the wrong committee as an answer.
     const m = answer.match(/\[\[([a-z-]+)\]\]/i);
-    const picked = m ? list.find(c => c.slug === m[1].toLowerCase()) : null;
-    res.json({ answer: answer.replace(/\[\[[a-z-]+\]\]/gi, '').trim(), committee: picked || null });
+    const tag = m ? m[1].toLowerCase() : null;
+    const picked = (tag && tag !== 'none') ? list.find(c => c.slug === tag) || null : null;
+    res.json({
+      answer: answer.replace(/\[\[[a-z-]+\]\]/gi, '').trim(),
+      committee: picked,
+      noMatch: !picked,
+    });
   } catch (err) {
     if (ctl.signal.aborted) return;
     console.error('[committees/ask]', err.message);

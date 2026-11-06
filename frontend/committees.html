@@ -98,8 +98,8 @@
   <div id="dir"><div class="spinner" style="margin:30px auto;display:block;"></div></div>
 </div>
 
-<script src="js/api.js?v=b0d4c75406"></script>
-<script src="js/padme.js?v=8474362f48"></script>
+<script src="js/api.js?v=ebb2f3c8a0"></script>
+<script src="js/padme.js?v=f2b805fb63"></script>
 <script>
 requireLogin();
 renderNav('committees');
@@ -140,11 +140,14 @@ function mdLite(src) {
   return out;
 }
 
+const FS_EMAIL = 'Faculty.Senate@unlv.edu';
+
 function chairPill(c) {
   // A placeholder like "Pending Committee Election" is not a person — never
-  // present it as one.
+  // present it as one. Give people somewhere to go rather than a dead end.
   if (!c.chair || /pending|election/i.test(c.chair)) {
-    return `<span class="chair" style="color:var(--muted);">Chair not currently listed</span>`;
+    return `<span class="chair" style="color:var(--muted);">No chair listed — contact ` +
+           `<a href="mailto:${FS_EMAIL}" class="chair-mail">${FS_EMAIL}</a></span>`;
   }
   const mail = c.chairEmail
     ? `<a href="mailto:${escHtml(c.chairEmail)}" class="chair-mail" title="Email ${escHtml(c.chair)}">${escHtml(c.chairEmail)}</a>`
@@ -163,6 +166,15 @@ async function ask() {
     const d = await apiFetch('/committees/ask', { method: 'POST', body: JSON.stringify({ question: q }) });
     const c = d.committee;
     box.innerHTML = `
+      ${!c ? `<div class="pick" style="border-color:var(--border);">
+        <div class="pick-top">
+          <div>
+            <h3>No committee matches this</h3>
+            <div class="pick-grp">Try the Faculty Senate office</div>
+          </div>
+          <a class="btn btn-secondary btn-sm" href="mailto:${FS_EMAIL}">Email ${FS_EMAIL}</a>
+        </div>
+      </div>` : ''}
       ${c ? `<div class="pick">
         <div class="pick-top">
           <div>

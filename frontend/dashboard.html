@@ -93,7 +93,7 @@
     <select id="filter-status">
       <option value="">All Statuses</option>
       <option value="active">Active</option>
-      <option value="stuck">Stuck</option>
+      <option value="stuck">On Hold</option>
       <option value="published">Published</option>
     </select>
     <input type="text" id="filter-search" placeholder="Search title…" style="min-width:200px;">
@@ -127,8 +127,8 @@
   </div>
 </div>
 
-<script src="js/api.js?v=b0d4c75406"></script>
-<script src="js/padme.js?v=8474362f48"></script>
+<script src="js/api.js?v=ebb2f3c8a0"></script>
+<script src="js/padme.js?v=f2b805fb63"></script>
 <script>
 requireLogin();
 renderNav('dashboard');
@@ -277,7 +277,7 @@ function colHTML(phase, cards) {
             <span>${relativeTime(t.updated_at)}</span>
           </div>
           ${deadlineBadge(t)}
-          ${t.status === 'stuck' ? '<div style="margin-top:4px;font-size:0.75rem;color:var(--danger);font-weight:600;">⚠ STUCK</div>' : ''}
+          ${t.status === 'stuck' ? '<div style="margin-top:4px;font-size:0.75rem;color:var(--danger);font-weight:600;">⚠ ON HOLD</div>' : ''}
         </a>
       `).join('')}
     </div>

@@ -126,7 +126,7 @@ function formatDate(dateStr) {
 }
 
 function statusBadge(status, phase) {
-  if (status === 'stuck') return '<span class="phase-badge phase-stuck">STUCK</span>';
+  if (status === 'stuck') return '<span class="phase-badge phase-stuck">ON HOLD</span>';
   if (status === 'published') return `<span class="phase-badge phase-published">${(phase || 'COMPLETE').replace(/_/g,' ')}</span>`;
   // PUBLISH_TO_WEBSITE is a wait state — the ticket is approved but sitting with
   // the Provost office until it actually goes live.
