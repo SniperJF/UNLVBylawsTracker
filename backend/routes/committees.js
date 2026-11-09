@@ -5,8 +5,16 @@ const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 router.use(requireAuth);
 
-const OLLAMA_URL = (process.env.OLLAMA_URL || 'http://oceanus.cs.unlv.edu:11434').replace(/\/+$/, '');
+const OLLAMA_URL = (process.env.OLLAMA_URL || 'http://falcon9.cs.unlv.edu:11434').replace(/\/+$/, '');
 const CHAT_MODEL = process.env.CHAT_MODEL || 'qwen3.8:27b';
+// falcon9 keeps qwen3.8:27b resident at its full 262144 context. Ollama keys a
+// loaded instance on context size, so asking for anything smaller evicts that
+// instance and reloads — measured at 18-38s per call. Matching it costs nothing
+// extra (the VRAM is already committed) and answers in ~0.6s.
+const NUM_CTX = Number(process.env.OLLAMA_NUM_CTX ?? 262144);
+// -1 preserves the indefinite pin. Any finite value would shorten it for every
+// other user of that shared host.
+const KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE ?? -1;
 const BASE = 'https://www.unlv.edu/facultysenate/committees/';
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // chairs change at most once a term
 
@@ -213,8 +221,8 @@ WHEN NOTHING FITS
         messages: [{ role: 'system', content: system }, { role: 'user', content: question }],
         stream: false,
         think: false,
-        keep_alive: '30m',
-        options: { temperature: 0.3, top_p: 0.9, num_ctx: 16384 },
+        keep_alive: KEEP_ALIVE,
+        options: { temperature: 0.3, top_p: 0.9, num_ctx: NUM_CTX },
       }),
     });
     if (!up.ok) return res.status(502).json({ error: `Model unavailable (HTTP ${up.status})` });

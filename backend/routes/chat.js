@@ -6,8 +6,16 @@ const router = express.Router();
 router.use(requireAuth);
 
 // Same Ollama host and model the ALZ-Observatory bubble uses.
-const OLLAMA_URL = (process.env.OLLAMA_URL || 'http://oceanus.cs.unlv.edu:11434').replace(/\/+$/, '');
+const OLLAMA_URL = (process.env.OLLAMA_URL || 'http://falcon9.cs.unlv.edu:11434').replace(/\/+$/, '');
 const CHAT_MODEL = process.env.CHAT_MODEL || 'qwen3.8:27b';
+// falcon9 keeps qwen3.8:27b resident at its full 262144 context. Ollama keys a
+// loaded instance on context size, so asking for anything smaller evicts that
+// instance and reloads — measured at 18-38s per call. Matching it costs nothing
+// extra (the VRAM is already committed) and answers in ~0.6s.
+const NUM_CTX = Number(process.env.OLLAMA_NUM_CTX ?? 262144);
+// -1 preserves the indefinite pin. Any finite value would shorten it for every
+// other user of that shared host.
+const KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE ?? -1;
 
 const MAX_MESSAGE_CHARS = 4000;
 const PAGE_CONTEXT_MAX_CHARS = 8000;
@@ -117,11 +125,11 @@ router.post('/stream', chatLimiter, async (req, res) => {
         messages,
         stream: true,
         think: false,       // qwen3.8 reasons at length by default; not wanted here
-        keep_alive: '30m',  // avoid a cold model reload between questions
+        keep_alive: KEEP_ALIVE,
         options: {
           temperature: 0.4,
           top_p: 0.9,
-          num_ctx: 16384,   // ollama's ~4k default silently drops the page context
+          num_ctx: NUM_CTX,
         },
       }),
     });
