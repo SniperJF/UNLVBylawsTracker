@@ -127,14 +127,14 @@
   </div>
 </div>
 
-<script src="js/api.js?v=ebb2f3c8a0"></script>
+<script src="js/api.js?v=a5276fb6ed"></script>
 <script src="js/padme.js?v=f2b805fb63"></script>
 <script>
 requireLogin();
 renderNav('dashboard');
 
-const TRACK_A = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','CAMPUS_VOTE','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISH_TO_WEBSITE','COMPLETE'];
-const TRACK_B = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','GENERAL_COUNSEL','PRESIDENT_REVIEW','CHANCELLOR_REVIEW','PUBLISH_TO_WEBSITE','COMPLETE'];
+const TRACK_A = ['COMMITTEE_VOTE','EC_REVIEW','SENATE_AGENDA','SENATE_FLOOR','CAMPUS_VOTE','COUNSEL_PRESIDENT','CHANCELLOR_REVIEW','PUBLISH_TO_WEBSITE','COMPLETE'];
+const TRACK_B = ['UNIT_DRAFTING','SUBMITTED_OFA','OFA_REVIEW','COUNSEL_PRESIDENT','CHANCELLOR_REVIEW','PUBLISH_TO_WEBSITE','COMPLETE'];
 
 let allTickets = [];
 
@@ -221,7 +221,7 @@ function renderKanban(tickets) {
   });
 }
 
-const PHASE_DEADLINES = { PRESIDENT_REVIEW: 20, CHANCELLOR_REVIEW: 45 };
+const PHASE_DEADLINES = { COUNSEL_PRESIDENT: 20, CHANCELLOR_REVIEW: 45 };
 
 function deadlineBadge(t) {
   const days = PHASE_DEADLINES[t.current_phase];
@@ -241,8 +241,7 @@ const PHASE_ICONS = {
   SENATE_AGENDA:     { key:'agenda',    desc:'Amendment is placed on the full Senate meeting agenda' },
   SENATE_FLOOR:      { key:'senate',    desc:'Full senate debates and takes a floor vote on the amendment' },
   CAMPUS_VOTE:       { key:'campus',    desc:'Amendment goes to a campus-wide faculty vote' },
-  GENERAL_COUNSEL:   { key:'counsel',   desc:'University legal counsel reviews language and compliance' },
-  PRESIDENT_REVIEW:  { key:'president', desc:'President signs — 20 day mandatory review period begins' },
+  COUNSEL_PRESIDENT: { key:'president', desc:'Legal counsel review and presidential signature share one 20 day window — if it lapses the Senate must re-vote' },
   CHANCELLOR_REVIEW: { key:'chancellor',desc:'NSHE Chancellor signs — final system-level approval' },
   PUBLISH_TO_WEBSITE:{ key:'provost',   desc:'Waiting on the Provost office to post the amendment to the website' },
   COMPLETE:          { key:'published', desc:'Amendment is live on the website and the record is closed' },
@@ -254,7 +253,7 @@ const PHASE_ICONS = {
 function colHTML(phase, cards) {
   const hasDeadline = PHASE_DEADLINES[phase];
   const pi = PHASE_ICONS[phase];
-  const colTitle = phase.replace(/_/g,' ') + (hasDeadline ? ` <span style="font-size:0.65rem;color:var(--muted);font-weight:400;">(${hasDeadline}d)</span>` : '');
+  const colTitle = phaseLabel(phase) + (hasDeadline ? ` <span style="font-size:0.65rem;color:var(--muted);font-weight:400;">(${hasDeadline} Days)</span>` : '');
   const iconHtml = pi ? `
     <div class="col-icon">
       <div class="col-icon-fig">${DS[pi.key]}</div>
@@ -289,7 +288,7 @@ function renderList(tickets) {
     <tr onclick="window.location='ticket.html?id=${t.id}'">
       <td><strong>${escHtml(t.title)}</strong>${t.bylaws_section ? `<br><span class="text-xs text-muted">§${escHtml(t.bylaws_section)}</span>` : ''}</td>
       <td><span style="font-size:0.78rem;color:var(--muted);">${t.type === 'university_amendment' ? 'Univ. Amendment' : 'Unit Bylaws'}</span></td>
-      <td><span class="font-mono text-xs">${t.current_phase.replace(/_/g,' ')}</span></td>
+      <td><span class="font-mono text-xs">${phaseLabel(t.current_phase)}</span></td>
       <td>${statusBadge(t.status, t.current_phase)}</td>
       <td>${(() => { const b = deadlineBadge(t); return b || '<span class="text-muted">—</span>'; })()}</td>
       <td>${t.assignee_name ? escHtml(t.assignee_name) : '<span class="text-muted">—</span>'}</td>

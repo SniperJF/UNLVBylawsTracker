@@ -125,14 +125,25 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// Phases whose underscore form reads badly; everything else falls back to
+// replacing underscores with spaces.
+const PHASE_LABELS = {
+  COUNSEL_PRESIDENT:  'General Counsel & President',
+  PUBLISH_TO_WEBSITE: 'Publish to Website',
+  SUBMITTED_OFA:      'Submitted to OFA',
+};
+function phaseLabel(p) {
+  return PHASE_LABELS[p] || String(p || '').replace(/_/g, ' ');
+}
+
 function statusBadge(status, phase) {
   if (status === 'stuck') return '<span class="phase-badge phase-stuck">ON HOLD</span>';
-  if (status === 'published') return `<span class="phase-badge phase-published">${(phase || 'COMPLETE').replace(/_/g,' ')}</span>`;
+  if (status === 'published') return `<span class="phase-badge phase-published">${phaseLabel(phase || 'COMPLETE')}</span>`;
   // PUBLISH_TO_WEBSITE is a wait state — the ticket is approved but sitting with
   // the Provost office until it actually goes live.
-  const waitPhases = ['PRESIDENT_REVIEW','CHANCELLOR_REVIEW','GENERAL_COUNSEL','OFA_REVIEW','PUBLISH_TO_WEBSITE'];
-  if (waitPhases.includes(phase)) return `<span class="phase-badge phase-waiting">${phase.replace(/_/g,' ')}</span>`;
-  return `<span class="phase-badge phase-active">${phase.replace(/_/g,' ')}</span>`;
+  const waitPhases = ['COUNSEL_PRESIDENT','CHANCELLOR_REVIEW','OFA_REVIEW','PUBLISH_TO_WEBSITE'];
+  if (waitPhases.includes(phase)) return `<span class="phase-badge phase-waiting">${phaseLabel(phase)}</span>`;
+  return `<span class="phase-badge phase-active">${phaseLabel(phase)}</span>`;
 }
 
 // Render nav for logged-in users

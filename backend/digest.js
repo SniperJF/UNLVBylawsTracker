@@ -7,7 +7,7 @@ const { sendDigestEmail } = require('./email');
 
 // Server clock is UTC. 16:00 UTC is 8am Pacific in winter, 9am in summer.
 const SEND_HOUR_UTC = Number(process.env.DIGEST_HOUR_UTC ?? 16);
-const PHASE_DEADLINES = { PRESIDENT_REVIEW: 20, CHANCELLOR_REVIEW: 45 };
+const PHASE_DEADLINES = { COUNSEL_PRESIDENT: 20, CHANCELLOR_REVIEW: 45 };
 
 // NULL = follow the role default, so a role change takes effect immediately.
 function wantsDigest(user) {
@@ -65,7 +65,7 @@ function buildDigest(sinceHours = 24) {
         WHERE ticket_id = t.id AND phase = t.current_phase AND exited_at IS NULL
         ORDER BY entered_at DESC LIMIT 1) AS entered_at
     FROM tickets t
-    WHERE t.status != 'published' AND t.current_phase IN ('PRESIDENT_REVIEW','CHANCELLOR_REVIEW')
+    WHERE t.status != 'published' AND t.current_phase IN ('COUNSEL_PRESIDENT','CHANCELLOR_REVIEW')
   `).all();
 
   const deadlines = [];
