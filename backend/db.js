@@ -130,6 +130,15 @@ try {
   db.exec("ALTER TABLE users ADD COLUMN digest_optin INTEGER DEFAULT NULL");
 } catch { /* column already exists */ }
 
+// Archiving hides a ticket without destroying the record. Nothing cascades, so
+// restoring brings back its history, comments and files intact.
+try {
+  db.exec("ALTER TABLE tickets ADD COLUMN archived_at TEXT DEFAULT NULL");
+} catch { /* column already exists */ }
+try {
+  db.exec("ALTER TABLE tickets ADD COLUMN archived_by INTEGER REFERENCES users(id)");
+} catch { /* column already exists */ }
+
 // One row per calendar day the digest was sent, so a restart cannot re-send.
 db.exec(`
   CREATE TABLE IF NOT EXISTS digest_runs (

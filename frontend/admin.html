@@ -66,6 +66,7 @@
     <button class="tab" data-tab="audit">Audit Log</button>
     <button class="tab" data-tab="backup">Backup</button>
     <button class="tab" data-tab="digest">Email Digest</button>
+    <button class="tab" data-tab="archived">Archived</button>
   </div>
 
   <!-- Pending Requests -->
@@ -140,6 +141,19 @@
       </table>
     </div>
   </div>
+
+  <!-- Archived tickets -->
+  <div class="tab-panel" id="tab-archived">
+    <div class="text-sm text-muted" style="margin-bottom:14px;">
+      Archived tickets are hidden from the dashboard and the daily digest. Nothing was deleted — history, comments and files are intact.
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Title</th><th>Phase</th><th>Archived</th><th></th></tr></thead>
+        <tbody id="archived-body"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- Reset password modal -->
@@ -179,6 +193,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     if (tab.dataset.tab === 'users') loadUsers();
     if (tab.dataset.tab === 'audit') loadAudit();
     if (tab.dataset.tab === 'digest') loadDigest();
+    if (tab.dataset.tab === 'archived') loadArchived();
   });
 });
 
@@ -502,6 +517,34 @@ document.getElementById('send-test').addEventListener('click', async () => {
     out.innerHTML = `<span style="color:var(--danger,#ef4444);">${escHtml(err.message)}</span>`;
   } finally { btn.disabled = false; btn.textContent = 'Send test now'; }
 });
+
+// ── Archived tickets ──────────────────────────────────────────────────────
+async function loadArchived() {
+  const body = document.getElementById('archived-body');
+  try {
+    const ts = await apiFetch('/tickets?archived=1');
+    if (!ts.length) {
+      body.innerHTML = '<tr><td colspan="4" class="text-muted text-sm" style="padding:18px;">No archived tickets.</td></tr>';
+      return;
+    }
+    body.innerHTML = ts.map(t => `
+      <tr>
+        <td><a href="ticket.html?id=${t.id}" style="color:var(--scarlet);text-decoration:none;"><strong>${escHtml(t.title)}</strong></a></td>
+        <td class="text-sm">${escHtml(phaseLabel(t.current_phase))}</td>
+        <td class="text-sm text-muted">${escHtml(formatDateTime(t.archived_at))}</td>
+        <td><button class="btn btn-secondary btn-sm restore-btn" data-tid="${t.id}">Restore</button></td>
+      </tr>`).join('');
+    body.querySelectorAll('.restore-btn').forEach(b => {
+      b.addEventListener('click', async () => {
+        b.disabled = true; b.textContent = 'Restoring…';
+        try { await apiFetch(`/tickets/${b.dataset.tid}/restore`, { method: 'POST' }); loadArchived(); }
+        catch (err) { showAlert(err.message, 'error'); b.disabled = false; b.textContent = 'Restore'; }
+      });
+    });
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="4"><div class="alert alert-error">${escHtml(err.message)}</div></td></tr>`;
+  }
+}
 
 loadRequests();
 </script>

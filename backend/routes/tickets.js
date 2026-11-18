@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db');
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth, requireRole, ADMIN_ROLES } = require('../middleware/auth');
 const { logAudit } = require('../middleware/audit');
 
 const router = express.Router();
@@ -26,7 +26,7 @@ function createNotification(userId, type, message, ticketId) {
 
 // GET /api/tickets — all roles can view
 router.get('/', (req, res) => {
-  const { type, status, phase, assignee_id } = req.query;
+  const { type, status, phase, assignee_id, archived } = req.query;
   let sql = `
     SELECT t.*,
       u1.name as originator_name, u1.email as originator_email,
@@ -46,6 +46,8 @@ router.get('/', (req, res) => {
   if (status) { sql += ' AND t.status = ?'; params.push(status); }
   if (phase) { sql += ' AND t.current_phase = ?'; params.push(phase); }
   if (assignee_id) { sql += ' AND t.assignee_id = ?'; params.push(assignee_id); }
+  // Archived tickets stay out of every normal view; ?archived=1 lists only them.
+  sql += archived ? ' AND t.archived_at IS NOT NULL' : ' AND t.archived_at IS NULL';
   sql += ' ORDER BY t.updated_at DESC';
   res.json(db.prepare(sql).all(...params));
 });
@@ -199,6 +201,44 @@ router.post('/:id/phase', requireRole('admin','bylaws_chair','senate_manager'), 
   db.prepare('UPDATE tickets SET current_phase = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(phase, newStatus, ticket.id);
   logAudit(req.user.id, req.user.name, 'ticket.phase_set', 'ticket', ticket.id, { phase }, req.ip);
   res.json({ message: 'Phase set', new_phase: phase });
+});
+
+// Archiving is reversible and cascades nothing — comments, phase history and
+// uploaded files are all left in place so a restore is lossless.
+function canArchive(user, ticket) {
+  return ADMIN_ROLES.includes(user.role) || user.id === ticket.originator_id;
+}
+
+// POST /api/tickets/:id/archive
+router.post('/:id/archive', (req, res) => {
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+  if (!canArchive(req.user, ticket)) {
+    return res.status(403).json({ error: 'Only an admin or the originator can archive this ticket' });
+  }
+  if (ticket.archived_at) return res.status(400).json({ error: 'Already archived' });
+
+  db.prepare('UPDATE tickets SET archived_at = CURRENT_TIMESTAMP, archived_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run(req.user.id, ticket.id);
+  logAudit(req.user.id, req.user.name, 'ticket.archive', 'ticket', ticket.id,
+    { title: ticket.title, phase: ticket.current_phase }, req.ip);
+  res.json({ message: 'Ticket archived' });
+});
+
+// POST /api/tickets/:id/restore
+router.post('/:id/restore', (req, res) => {
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+  if (!canArchive(req.user, ticket)) {
+    return res.status(403).json({ error: 'Only an admin or the originator can restore this ticket' });
+  }
+  if (!ticket.archived_at) return res.status(400).json({ error: 'Not archived' });
+
+  db.prepare('UPDATE tickets SET archived_at = NULL, archived_by = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run(ticket.id);
+  logAudit(req.user.id, req.user.name, 'ticket.restore', 'ticket', ticket.id,
+    { title: ticket.title }, req.ip);
+  res.json({ message: 'Ticket restored' });
 });
 
 module.exports = router;

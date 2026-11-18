@@ -89,6 +89,7 @@
       <div class="flex gap-2" id="action-buttons"></div>
     </div>
 
+    <div id="archived-banner" class="hidden"></div>
     <div id="deadline-banner" class="hidden"></div>
     <div id="alert-area"></div>
 
@@ -256,19 +257,42 @@ function render() {
 
   // Phase actions (admin/chair/manager can advance)
   const canAdvance = ['admin','bylaws_chair','faculty_senate_chair','senate_manager','provost_office'].includes(user.role);
+  // Archiving is separate from advancing: an originator may archive their own
+  // ticket without having any power to move it through phases.
+  const canArchive = isAdminRole(user.role) || user.id === ticket.originator_id;
   const phaseActionsEl = document.getElementById('phase-actions');
-  if (canAdvance && ticket.status !== 'published') {
+  const showMovers = canAdvance && ticket.status !== 'published' && !ticket.archived_at;
+
+  if (showMovers || canArchive) {
+    const movers = showMovers ? `
+        ${ticket.current_phase !== phases[phases.length-1] ? `<button class="btn btn-primary" id="advance-btn">Advance to Next Phase</button>` : ''}
+        <button class="btn ${ticket.status === 'stuck' ? 'btn-secondary' : 'btn-danger'}" id="stuck-btn">${ticket.status === 'stuck' ? 'Remove from Hold' : 'Put on Hold'}</button>` : '';
+
+    const archiveBtn = !canArchive ? '' : ticket.archived_at
+      ? `<button class="btn btn-secondary" id="restore-btn">Restore from Archive</button>`
+      : `<button class="btn btn-secondary" id="archive-btn" style="color:var(--danger,#ef4444);">Archive Ticket</button>`;
+
+    phaseActionsEl.classList.remove('hidden');
     phaseActionsEl.innerHTML = `
       <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px;font-weight:600;">Actions</div>
-      <div style="display:grid;gap:8px;">
-        ${ticket.current_phase !== phases[phases.length-1] ? `<button class="btn btn-primary" id="advance-btn">Advance to Next Phase</button>` : ''}
-        <button class="btn ${ticket.status === 'stuck' ? 'btn-secondary' : 'btn-danger'}" id="stuck-btn">${ticket.status === 'stuck' ? 'Remove from Hold' : 'Put on Hold'}</button>
-      </div>
+      <div style="display:grid;gap:8px;">${movers}${archiveBtn}</div>
+      ${canArchive && !ticket.archived_at ? '<div class="text-xs text-muted" style="margin-top:9px;line-height:1.5;">Archiving hides this from the board and the daily digest. Nothing is deleted and it can be restored.</div>' : ''}
     `;
     document.getElementById('advance-btn')?.addEventListener('click', advancePhase);
-    document.getElementById('stuck-btn').addEventListener('click', toggleStuck);
+    document.getElementById('stuck-btn')?.addEventListener('click', toggleStuck);
+    document.getElementById('archive-btn')?.addEventListener('click', () => setArchived(true));
+    document.getElementById('restore-btn')?.addEventListener('click', () => setArchived(false));
   } else {
     phaseActionsEl.classList.add('hidden');
+  }
+
+  // Banner so an archived ticket is never mistaken for a live one.
+  const archBanner = document.getElementById('archived-banner');
+  if (ticket.archived_at) {
+    archBanner.className = 'deadline-banner';
+    archBanner.textContent = `Archived ${formatDateTime(ticket.archived_at)} — hidden from the dashboard and daily digest.`;
+  } else {
+    archBanner.className = 'hidden';
   }
 
   // Attachments
@@ -554,6 +578,20 @@ async function deleteComment(commentId) {
     if (!list.querySelector('.comment')) list.innerHTML = '<div class="text-muted text-sm" style="margin-bottom:12px;">No comments yet.</div>';
   } catch (err) {
     document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
+  }
+}
+
+async function setArchived(on) {
+  const verb = on ? 'Archive' : 'Restore';
+  if (on && !confirm('Archive this ticket?\n\nIt disappears from the dashboard and the daily digest. Comments, files and history are kept, and it can be restored.')) return;
+  const btn = document.getElementById(on ? 'archive-btn' : 'restore-btn');
+  if (btn) { btn.disabled = true; btn.textContent = verb + '…'; }
+  try {
+    await apiFetch(`/tickets/${ticketId}/${on ? 'archive' : 'restore'}`, { method: 'POST' });
+    await load();
+  } catch (err) {
+    document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = verb === 'Archive' ? 'Archive Ticket' : 'Restore from Archive'; }
   }
 }
 

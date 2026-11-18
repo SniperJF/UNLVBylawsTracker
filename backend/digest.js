@@ -41,7 +41,7 @@ function buildDigest(sinceHours = 24) {
     FROM ticket_phase_history ph
     JOIN tickets t ON t.id = ph.ticket_id
     LEFT JOIN users u ON u.id = ph.entered_by
-    WHERE ph.entered_at >= ?
+    WHERE ph.entered_at >= ? AND t.archived_at IS NULL
     ORDER BY ph.entered_at DESC
   `).all(cutoff);
 
@@ -50,12 +50,12 @@ function buildDigest(sinceHours = 24) {
     FROM comments c
     JOIN tickets t ON t.id = c.ticket_id
     LEFT JOIN users u ON u.id = c.author_id
-    WHERE c.created_at >= ?
+    WHERE c.created_at >= ? AND t.archived_at IS NULL
     ORDER BY c.created_at DESC
   `).all(cutoff);
 
   const onHold = db.prepare(
-    `SELECT id, title, current_phase FROM tickets WHERE status = 'stuck' ORDER BY updated_at DESC`
+    `SELECT id, title, current_phase FROM tickets WHERE status = 'stuck' AND archived_at IS NULL ORDER BY updated_at DESC`
   ).all();
 
   // Anything sitting in a phase with a statutory clock.
@@ -65,7 +65,7 @@ function buildDigest(sinceHours = 24) {
         WHERE ticket_id = t.id AND phase = t.current_phase AND exited_at IS NULL
         ORDER BY entered_at DESC LIMIT 1) AS entered_at
     FROM tickets t
-    WHERE t.status != 'published' AND t.current_phase IN ('COUNSEL_PRESIDENT','CHANCELLOR_REVIEW')
+    WHERE t.archived_at IS NULL AND t.status != 'published' AND t.current_phase IN ('COUNSEL_PRESIDENT','CHANCELLOR_REVIEW')
   `).all();
 
   const deadlines = [];
@@ -83,9 +83,9 @@ function buildDigest(sinceHours = 24) {
     overdue: deadlines.filter(d => d.daysLeft < 0),
     dueSoon: deadlines.filter(d => d.daysLeft >= 0 && d.daysLeft <= 7),
     totals: {
-      active: db.prepare("SELECT COUNT(*) c FROM tickets WHERE status = 'active'").get().c,
+      active: db.prepare("SELECT COUNT(*) c FROM tickets WHERE status = 'active' AND archived_at IS NULL").get().c,
       onHold: onHold.length,
-      complete: db.prepare("SELECT COUNT(*) c FROM tickets WHERE status = 'published'").get().c,
+      complete: db.prepare("SELECT COUNT(*) c FROM tickets WHERE status = 'published' AND archived_at IS NULL").get().c,
     },
   };
 }
