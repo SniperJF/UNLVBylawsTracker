@@ -149,9 +149,31 @@
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Title</th><th>Phase</th><th>Archived</th><th></th></tr></thead>
+        <thead><tr><th>Title</th><th>Phase</th><th>Archived</th><th>Contents</th><th></th></tr></thead>
         <tbody id="archived-body"></tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+
+<!-- Purge confirmation -->
+<div id="purge-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:300;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;max-width:460px;width:90%;">
+    <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px;color:var(--danger,#ef4444);">Purge permanently</div>
+    <div class="text-sm" style="margin-bottom:6px;" id="purge-what"></div>
+    <div class="text-sm text-muted" style="line-height:1.6;margin-bottom:14px;">
+      This deletes the ticket, its comments, phase history, attachment records and the
+      uploaded files on disk. It cannot be undone and is not covered by Restore.
+    </div>
+    <div id="purge-alert"></div>
+    <div class="form-group">
+      <label>Type <strong id="purge-expect"></strong> to confirm</label>
+      <input type="text" class="form-control" id="purge-input" autocomplete="off">
+    </div>
+    <div class="flex gap-2 mt-3">
+      <button class="btn btn-danger" id="purge-confirm">Purge permanently</button>
+      <button class="btn btn-secondary" id="purge-cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -524,7 +546,7 @@ async function loadArchived() {
   try {
     const ts = await apiFetch('/tickets?archived=1');
     if (!ts.length) {
-      body.innerHTML = '<tr><td colspan="4" class="text-muted text-sm" style="padding:18px;">No archived tickets.</td></tr>';
+      body.innerHTML = '<tr><td colspan="5" class="text-muted text-sm" style="padding:18px;">No archived tickets.</td></tr>';
       return;
     }
     body.innerHTML = ts.map(t => `
@@ -532,8 +554,15 @@ async function loadArchived() {
         <td><a href="ticket.html?id=${t.id}" style="color:var(--scarlet);text-decoration:none;"><strong>${escHtml(t.title)}</strong></a></td>
         <td class="text-sm">${escHtml(phaseLabel(t.current_phase))}</td>
         <td class="text-sm text-muted">${escHtml(formatDateTime(t.archived_at))}</td>
-        <td><button class="btn btn-secondary btn-sm restore-btn" data-tid="${t.id}">Restore</button></td>
+        <td class="text-xs text-muted">${t.comment_count || 0} comments · ${t.attachment_count || 0} files</td>
+        <td>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm restore-btn" data-tid="${t.id}">Restore</button>
+            <button class="btn btn-danger btn-sm purge-btn" data-tid="${t.id}" data-title="${escHtml(t.title)}">Purge</button>
+          </div>
+        </td>
       </tr>`).join('');
+    body.querySelectorAll('.purge-btn').forEach(b => openPurge(b));
     body.querySelectorAll('.restore-btn').forEach(b => {
       b.addEventListener('click', async () => {
         b.disabled = true; b.textContent = 'Restoring…';
@@ -542,9 +571,53 @@ async function loadArchived() {
       });
     });
   } catch (err) {
-    body.innerHTML = `<tr><td colspan="4"><div class="alert alert-error">${escHtml(err.message)}</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="5"><div class="alert alert-error">${escHtml(err.message)}</div></td></tr>`;
   }
 }
+
+// Purge is irreversible, so it asks for the ticket number to be typed rather
+// than relying on a confirm() people click through.
+function openPurge(btn) {
+  btn.addEventListener('click', () => {
+    const id = btn.dataset.tid;
+    document.getElementById('purge-what').textContent = `#${id} — ${btn.dataset.title}`;
+    document.getElementById('purge-input').value = '';
+    document.getElementById('purge-alert').innerHTML = '';
+    document.getElementById('purge-expect').textContent = id;
+    document.getElementById('purge-modal').dataset.tid = id;
+    document.getElementById('purge-modal').style.display = 'flex';
+    document.getElementById('purge-input').focus();
+  });
+}
+
+document.getElementById('purge-cancel').addEventListener('click', () => {
+  document.getElementById('purge-modal').style.display = 'none';
+});
+
+document.getElementById('purge-confirm').addEventListener('click', async () => {
+  const modal = document.getElementById('purge-modal');
+  const id = modal.dataset.tid;
+  const typed = document.getElementById('purge-input').value.trim();
+  const out = document.getElementById('purge-alert');
+  if (typed !== String(id)) {
+    out.innerHTML = `<div class="alert alert-error">Type ${escHtml(id)} to confirm.</div>`;
+    return;
+  }
+  const btn = document.getElementById('purge-confirm');
+  btn.disabled = true; btn.textContent = 'Purging…';
+  try {
+    const r = await apiFetch(`/tickets/${id}/purge`, {
+      method: 'POST', body: JSON.stringify({ confirm: Number(id) }),
+    });
+    modal.style.display = 'none';
+    showAlert(`Purged #${id} — ${r.comments} comments, ${r.attachments} attachments (${r.filesRemoved} files), ${r.history} history rows.`, 'success');
+    loadArchived();
+  } catch (err) {
+    out.innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Purge permanently';
+  }
+});
 
 loadRequests();
 </script>

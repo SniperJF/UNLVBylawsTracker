@@ -1,7 +1,10 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const db = require('../db');
 const { requireAuth, requireRole, ADMIN_ROLES } = require('../middleware/auth');
 const { logAudit } = require('../middleware/audit');
+const { uploadsDir } = require('../middleware/upload');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -239,6 +242,60 @@ router.post('/:id/restore', (req, res) => {
   logAudit(req.user.id, req.user.name, 'ticket.restore', 'ticket', ticket.id,
     { title: ticket.title }, req.ip);
   res.json({ message: 'Ticket restored' });
+});
+
+// POST /api/tickets/:id/purge — permanent, admin only, archived only.
+// This is the one action that destroys a governance record, so it is gated on
+// the ticket already being archived and on the caller echoing back its id.
+router.post('/:id/purge', requireRole(...ADMIN_ROLES), (req, res) => {
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+  if (!ticket.archived_at) {
+    return res.status(400).json({ error: 'Archive the ticket first — only archived tickets can be purged' });
+  }
+  if (Number(req.body?.confirm) !== ticket.id) {
+    return res.status(400).json({ error: 'Confirmation does not match this ticket' });
+  }
+
+  const attachments = db.prepare('SELECT id, filename FROM ticket_attachments WHERE ticket_id = ?').all(ticket.id);
+  const counts = {
+    comments: db.prepare('SELECT COUNT(*) c FROM comments WHERE ticket_id = ?').get(ticket.id).c,
+    history: db.prepare('SELECT COUNT(*) c FROM ticket_phase_history WHERE ticket_id = ?').get(ticket.id).c,
+    attachments: attachments.length,
+    notifications: db.prepare('SELECT COUNT(*) c FROM notifications WHERE ticket_id = ?').get(ticket.id).c,
+  };
+
+  // notifications has no ON DELETE CASCADE, so it must go first or the delete
+  // trips the foreign key check. The others cascade, but are removed explicitly
+  // so the audit entry can state exactly what was destroyed.
+  const purgeTx = db.transaction(() => {
+    db.prepare('DELETE FROM notifications WHERE ticket_id = ?').run(ticket.id);
+    db.prepare('DELETE FROM comments WHERE ticket_id = ?').run(ticket.id);
+    db.prepare('DELETE FROM ticket_attachments WHERE ticket_id = ?').run(ticket.id);
+    db.prepare('DELETE FROM ticket_phase_history WHERE ticket_id = ?').run(ticket.id);
+    db.prepare('DELETE FROM tickets WHERE id = ?').run(ticket.id);
+  });
+
+  try {
+    purgeTx();
+  } catch (e) {
+    console.error('[purge]', e.message);
+    return res.status(500).json({ error: 'Purge failed — nothing was removed' });
+  }
+
+  // Unlink only after the transaction commits: had it rolled back, the rows
+  // would still point at these files.
+  let filesRemoved = 0;
+  for (const a of attachments) {
+    if (!/^[0-9a-f-]{36}\.[a-z0-9]{1,8}$/i.test(a.filename)) continue;
+    const fp = path.join(uploadsDir, a.filename);
+    if (!fp.startsWith(uploadsDir + path.sep)) continue;
+    try { if (fs.existsSync(fp)) { fs.unlinkSync(fp); filesRemoved++; } } catch { /* row is gone either way */ }
+  }
+
+  logAudit(req.user.id, req.user.name, 'ticket.purge', 'ticket', ticket.id,
+    { title: ticket.title, phase: ticket.current_phase, ...counts, filesRemoved }, req.ip);
+  res.json({ message: 'Ticket purged', ...counts, filesRemoved });
 });
 
 module.exports = router;
